@@ -6,7 +6,7 @@ TODO:
 * Consider other forces, springs, damping, constraints. You may need a different way to define your scenes to include other mechanisms.
 * 3D simulation
    * ~~Block~~
-   * BVNode
+   * ~~BVNode~~
    * CollisionComputationMonitor
    * CollisionProcessor
    * Contact
