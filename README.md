@@ -9,7 +9,7 @@ TODO:
    * ~~BVNode~~
    * CollisionComputationMonitor
    * CollisionProcessor
-   * Contact
+   * ~~Contact~~
    * Disc
    * Factory
    * ImageBlocker
