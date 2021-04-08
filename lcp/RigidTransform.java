@@ -41,30 +41,39 @@ public class RigidTransform {
      * @param direction
      * @param p
      */
-    public void set( double theta, int direction, Tuple3d p ) {
+    public void set( Vector3d theta, int direction, Tuple3d p ) {
     	
-        double c = Math.cos(theta);
-        double s = Math.sin(theta);
+        double cx = Math.cos(theta.x);
+        double sx = Math.sin(theta.x);
+        Matrix4d Tx = new Matrix4d();
+        //rotation about x
+        Tx.m00 = 1; Tx.m01 =  0;  Tx.m02 = 0;    Tx.m03 = p.x;
+        Tx.m10 = 0; Tx.m11 =  cx; Tx.m12 = -sx;  Tx.m13 = p.y;
+        Tx.m10 = 0; Tx.m11 =  sx; Tx.m12 = cx;   Tx.m33 = p.z;
+        Tx.m30 = 0; Tx.m31 =  0;  Tx.m33 = 0;    Tx.m33 = 1;
         
-        if(direction == 0){
-        	//rotation about x
-        	T.m00 = 1; T.m01 =  0; T.m02 = 0;   T.m03 = p.x;
-            T.m10 = 0; T.m11 =  c; T.m12 = -s;  T.m13 = p.y;
-            T.m10 = 0; T.m11 =  s; T.m12 = c;   T.m33 = p.z;
-            T.m30 = 0; T.m31 =  0; T.m33 = 0;   T.m33 = 1;
-        }else if(direction == 1){
-        	//rotation about y 
-        	T.m00 = c; T.m01 =  0; T.m02 = s;   T.m03 = p.x;
-            T.m10 = 0; T.m11 =  1; T.m12 = 0;   T.m13 = p.y;
-            T.m10 = -s;T.m11 =  0; T.m12 = c;   T.m33 = p.z;
-            T.m30 = 0; T.m31 =  0; T.m33 = 0;   T.m33 = 1;
-        }else if(direction == 2){
-        	//rotation about z 
-        	T.m00 = c; T.m01 = -s; T.m02 = 0;   T.m03 = p.x;
-            T.m10 = s; T.m11 =  c; T.m12 = 0;   T.m13 = p.y;
-            T.m10 = 0; T.m11 =  0; T.m12 = 1;   T.m33 = p.z;
-            T.m30 = 0; T.m31 =  0; T.m33 = 0;   T.m33 = 1;
-        }
+        double cy = Math.cos(theta.y);
+        double sy = Math.sin(theta.y);
+        Matrix4d Ty = new Matrix4d();
+        //rotation about y 
+        Ty.m00 = cy; Ty.m01 =  0; Ty.m02 = sy;   Ty.m03 = p.x;
+        Ty.m10 = 0;  Ty.m11 =  1; Ty.m12 = 0;    Ty.m13 = p.y;
+        Ty.m10 = -sy;Ty.m11 =  0; Ty.m12 = cy;   Ty.m33 = p.z;
+        Ty.m30 = 0;  Ty.m31 =  0; Ty.m33 = 0;    Ty.m33 = 1;
+        
+        double cz = Math.cos(theta.z);
+        double sz = Math.sin(theta.z);
+        Matrix4d Tz = new Matrix4d();
+        //rotation about z 
+        Tz.m00 = cz; Tz.m01 = -sz; Tz.m02 = 0;   Tz.m03 = p.x;
+        Tz.m10 = sz; Tz.m11 =  cz; Tz.m12 = 0;   Tz.m13 = p.y;
+        Tz.m10 = 0;  Tz.m11 =  0;  Tz.m12 = 1;   Tz.m33 = p.z;
+        Tz.m30 = 0;  Tz.m31 =  0;  Tz.m33 = 0;   Tz.m33 = 1;
+        
+        //does it matter which rotation happens first?
+        T.mul(Tx,Ty);
+        T.mul(Ty,Tz);
+        
         
     }
     
