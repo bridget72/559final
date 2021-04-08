@@ -72,7 +72,7 @@ public class RigidTransform {
         
         //does it matter which rotation happens first?
         T.mul(Tx,Ty);
-        T.mul(Ty,Tz);
+        T.mul(T,Tz);
         
         
     }
