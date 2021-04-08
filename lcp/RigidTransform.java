@@ -41,7 +41,7 @@ public class RigidTransform {
      * @param direction
      * @param p
      */
-    public void set( Vector3d theta, int direction, Tuple3d p ) {
+    public void set( Vector3d theta, Tuple3d p ) {
     	
         double cx = Math.cos(theta.x);
         double sx = Math.sin(theta.x);
