@@ -7,7 +7,9 @@ import com.jogamp.opengl.GL;
 import com.jogamp.opengl.GL2;
 import com.jogamp.opengl.GLAutoDrawable;
 import javax.vecmath.Point2d;
+import javax.vecmath.Point3d;
 import javax.vecmath.Vector2d;
+import javax.vecmath.Vector3d;
 
 /**
  * Simple 2D rigid body based on image samples
@@ -30,10 +32,10 @@ public class RigidBody {
     BVNode root;
     
     /** accumulator for forces acting on this body */
-    Vector2d force = new Vector2d();
+    Vector3d force = new Vector3d();
     
     /** accumulator for torques acting on this body */
-    double torque;
+    Vector3d torque = new Vector3d();
     
     double massAngular;
     
@@ -52,18 +54,19 @@ public class RigidBody {
     RigidTransform transformW2B = new RigidTransform();
     
     /** linear velocity */
-    public Vector2d v = new Vector2d();
+    public Vector3d v = new Vector3d();
     
     /** Position of center of mass in the world frame */
-    public Point2d x = new Point2d();
+    public Point3d x = new Point3d();
 
-    public Point2d r = new Point2d();
+    public Point3d r = new Point3d();
     
     /** initial position of center of mass in the world frame */
-    Point2d x0 = new Point2d();
+    Point3d x0 = new Point3d();
     
     /** orientation angle in radians */
-    public double theta;
+    public Vector3d theta = new Vector3d();
+    
     
     /** angular velocity in radians per second */
     public double omega;
@@ -89,15 +92,17 @@ public class RigidBody {
             massLinear += mass;            
             x0.x += b.j * mass;
             x0.y += b.i * mass; 
+            x0.z += b.k * mass;
         }
         x0.scale ( 1 / massLinear );
         // set block positions in world and body coordinates 
         for ( Block b : blocks ) {
             b.pB.x = b.j - x0.x;
             b.pB.y = b.i - x0.y;
+            b.pB.z = b.k - x0.z;
         }
         // compute the rotational inertia
-        final Point2d zero = new Point2d(0,0);
+        final Point3d zero = new Point3d(0,0,0);
         for ( Block b : blocks ) {
             double mass = b.getColourMass();
             massAngular += mass*b.pB.distanceSquared(zero);
@@ -106,9 +111,11 @@ public class RigidBody {
         if ( blocks.size() == 1 ) {
             Block b = blocks.get(0);
             double mass = b.getColourMass();
-            massAngular = mass * (1+1)/12;
+            massAngular = mass * (1+1+1)/12;
         }
-        x.set(x0);        
+        x.set(x0);   
+        
+        // TODO: add code to do rotational dynamics
         transformB2W.set( theta, x );
         transformW2B.set( theta, x );
         transformW2B.invert();
@@ -170,12 +177,13 @@ public class RigidBody {
      * @param contactPointW
      * @param contactForceW
      */
-    public void applyContactForceW( Point2d contactPointW, Vector2d contactForceW ) {
+    public void applyContactForceW( Point3d contactPointW, Vector3d contactForceW ) {
         force.add( contactForceW );
-        // 
-        // torque = -ryfx + rxfy
-        r.set(contactPointW.x - x.x, contactPointW.y - x.y);
-        torque = - r.y*force.x + r.x*force.y;
+        // torque = fzry - fyrz, -fzrx + fxrz, fyrx - fxry
+        r.set(contactPointW.x - x.x, contactPointW.y - x.y, contactPointW.z - x.z);
+        torque.set(  force.z * r.y - force.y * r.z,
+        			-force.z * r.x + force.x * r.z, 
+        			 force.y * r.x - force.x * r.y); 
     }
     
     /**
@@ -186,18 +194,21 @@ public class RigidBody {
      */
     public void advanceTime( double dt ) {
         if ( !pinned ) {            
-            // TODO: obj1 use torques to advance the angular state of the rigid body
+            // TODO: fix here 
         	omega += dt*torque*jinv;
             theta += dt*omega;
-        	
+
+        	// https://graphics.pixar.com/pbm2001/pdf/notesg.pdf
             v.x += 1.0 / massLinear * force.x * dt;
             v.y += 1.0 / massLinear * force.y * dt;
+            v.z += 1.0 / massLinear * force.z * dt;
             x.x += v.x * dt;
             x.y += v.y * dt;
+            x.z += v.z * dt;
             updateTransformations();
         }        
-        force.set(0,0);
-        torque = 0;
+        force.set(0,0,0);
+        torque.set(0,0,0);
     }
     
     /**
@@ -214,12 +225,14 @@ public class RigidBody {
      * @param contactPointW
      * @param result the velocity
      */
-    public void getSpatialVelocity( Point2d contactPointW, Vector2d result ) {
+    public void getSpatialVelocity( Point3d contactPointW, Vector3d result ) {
         result.sub( contactPointW, x );
         result.scale( omega );        
         double xpart = -result.y;
         double ypart =  result.x;
-        result.set( xpart, ypart );
+        //TODO: what is the zpart here
+        double zpart = 0;
+        result.set( xpart, ypart,zpart  );
         result.add( v );
     }
     
@@ -324,23 +337,23 @@ public class RigidBody {
             gl.glPointSize(8);
             gl.glColor3f(0,0,0.7f);
             gl.glBegin( GL.GL_POINTS );
-            gl.glVertex2d(x.x, x.y);
+            gl.glVertex3d(x.x, x.y, x.z);
             gl.glEnd();
             gl.glPointSize(4);
             gl.glColor3f(1,1,1);
             gl.glBegin( GL.GL_POINTS );
-            gl.glVertex2d(x.x, x.y);
+            gl.glVertex3d(x.x, x.y, x.z);
             gl.glEnd();
         } else {
             gl.glPointSize(8);
             gl.glColor3f(0,0,0.7f);
             gl.glBegin( GL.GL_POINTS );
-            gl.glVertex2d(x.x, x.y);
+            gl.glVertex3d(x.x, x.y, x.z);
             gl.glEnd();
             gl.glPointSize(4);
             gl.glColor3f(0,0,1);
             gl.glBegin( GL.GL_POINTS );
-            gl.glVertex2d(x.x, x.y);
+            gl.glVertex3d(x.x, x.y, x.z);
             gl.glEnd();
         }
     }
