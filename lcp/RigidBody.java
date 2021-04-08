@@ -6,6 +6,10 @@ import java.util.HashMap;
 import com.jogamp.opengl.GL;
 import com.jogamp.opengl.GL2;
 import com.jogamp.opengl.GLAutoDrawable;
+
+import no.uib.cipr.matrix.AbstractMatrix;
+import no.uib.cipr.matrix.DenseMatrix;
+
 import javax.vecmath.Point2d;
 import javax.vecmath.Point3d;
 import javax.vecmath.Vector2d;
@@ -69,7 +73,7 @@ public class RigidBody {
     
     
     /** angular velocity in radians per second */
-    public double omega;
+    public Vector3d omega = new Vector3d();
 
     /** inverse of the linear mass, or zero if pinned */
     double minv;
@@ -195,10 +199,14 @@ public class RigidBody {
     public void advanceTime( double dt ) {
         if ( !pinned ) {            
             // TODO: fix here 
-        	omega += dt*torque*jinv;
-            theta += dt*omega;
+            omega.set(omega.x + dt*torque.x*jinv,
+        			  omega.y + dt*torque.y*jinv, 
+        			  omega.z + dt*torque.z*jinv);
+        	theta.set(theta.x + dt*omega.x,
+        			  theta.y + dt*omega.y,
+        			  theta.z + dt*omega.z);
 
-        	// https://graphics.pixar.com/pbm2001/pdf/notesg.pdf
+            // https://graphics.pixar.com/pbm2001/pdf/notesg.pdf
             v.x += 1.0 / massLinear * force.x * dt;
             v.y += 1.0 / massLinear * force.y * dt;
             v.z += 1.0 / massLinear * force.z * dt;
@@ -216,7 +224,8 @@ public class RigidBody {
      * @return the total kinetic energy
      */
     public double getKineticEnergy() {
-        return 0.5 * massLinear * v.lengthSquared() + 0.5 * massAngular * omega * omega; 
+        return 0.5 * massLinear * v.lengthSquared() + 
+        	   0.5 * massAngular * (omega.x * omega.x + omega.y * omega.y + omega.z * omega.z); 
     }
     
     /** 
@@ -227,12 +236,12 @@ public class RigidBody {
      */
     public void getSpatialVelocity( Point3d contactPointW, Vector3d result ) {
         result.sub( contactPointW, x );
-        result.scale( omega );        
-        double xpart = -result.y;
-        double ypart =  result.x;
-        //TODO: what is the zpart here
-        double zpart = 0;
-        result.set( xpart, ypart,zpart  );
+        
+        double xpart = -result.z*omega.y +  result.y*omega.z;
+        double ypart =  result.z*omega.x + -result.x*omega.z;
+        double zpart = -result.y*omega.x +  result.x*omega.y;
+        
+        result.set( xpart, ypart, zpart);
         result.add( v );
     }
     
@@ -252,9 +261,9 @@ public class RigidBody {
      * @param pW
      * @return true if intersection
      */
-    public boolean intersect( Point2d pW ) {
+    public boolean intersect( Point3d pW ) {
         if ( root.boundingDisc.isInDisc( pW ) ) {
-            Point2d pB = new Point2d();
+            Point3d pB = new Point3d();
             transformW2B.transform( pW, pB );
             for ( Block b : blocks ) {
                 if ( b.pB.distanceSquared( pB ) < Block.radius * Block.radius ) return true;
@@ -268,9 +277,9 @@ public class RigidBody {
      */
     public void reset() {
         x.set(x0);        
-        theta = 0;
-        v.set(0,0);
-        omega = 0;
+        theta.set(0,0,0);
+        v.set(0,0,0);
+        omega.set(0,0,0);
         transformB2W.set( theta, x );
         transformW2B.set( transformB2W );
         transformW2B.invert();
@@ -303,7 +312,10 @@ public class RigidBody {
         GL2 gl = drawable.getGL().getGL2();
         gl.glPushMatrix();
         gl.glTranslated( x.x, x.y, 0 );
-        gl.glRotated(theta*180/Math.PI, 0,0,1);
+        //TODO: check the axis here 
+        gl.glRotated(theta.x*180/Math.PI, 1,0,0);
+        gl.glRotated(theta.y*180/Math.PI, 0,1,0);
+        gl.glRotated(theta.z*180/Math.PI, 0,0,1);
         if ( myListID == -1 ) {
             Integer ID = mapBlocksToDisplayList.get(blocks);
             if ( ID == null ) {
