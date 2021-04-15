@@ -17,7 +17,7 @@ public class Block {
     /** Transparency with which to draw all blocks */
     static float alpha;
     
-    /** radiuis of the sphere that encloses the block */
+    /** Radius of the sphere that encloses the block */
     static double radius = Math.sqrt(2) * 0.5;// * 0.9; // 90% of the normal size... allow for some overlap?
     
     /** Block pixel colour */

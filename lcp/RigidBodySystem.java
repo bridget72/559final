@@ -8,7 +8,9 @@ import com.jogamp.opengl.GLAutoDrawable;
 import javax.swing.JPanel;
 import javax.swing.border.TitledBorder;
 import javax.vecmath.Point2d;
+import javax.vecmath.Point3d;
 import javax.vecmath.Vector2d;
+import javax.vecmath.Vector3d;
 
 import mintools.parameters.BooleanParameter;
 import mintools.parameters.DoubleParameter;
@@ -59,9 +61,12 @@ public class RigidBodySystem {
         final Random rand = new Random();
         for ( RigidBody b : bodies ) {
             if ( b.pinned ) continue;
-            b.omega += rand.nextDouble()*2-1;
+            b.omega.x += rand.nextDouble()*2-1;
+            b.omega.y += rand.nextDouble()*2-1;
+            b.omega.z += rand.nextDouble()*2-1;
             b.v.x += rand.nextDouble()*2-1;
-            b.v.y += rand.nextDouble()*2-1;                
+            b.v.y += rand.nextDouble()*2-1;    
+            b.v.z += rand.nextDouble()*2-1;   
         }
     }
     
@@ -85,7 +90,7 @@ public class RigidBodySystem {
         mouseSpring.apply();
         // apply gravity to all bodies
         if ( useGravity.getValue() ) {
-            Vector2d force = new Vector2d();
+            Vector3d force = new Vector3d();
             for ( RigidBody b : bodies ) {
                 double theta = gravityAngle.getValue() / 180.0 * Math.PI;
                 force.set( Math.cos( theta ), Math.sin(theta) );
@@ -114,7 +119,7 @@ public class RigidBodySystem {
      * @param p
      * @return a body containing the given point
      */
-    public RigidBody pickBody( Point2d p ) {
+    public RigidBody pickBody( Point3d p ) {
         for ( RigidBody body : bodies ) {
             if ( body.intersect( p ) ) {
                 return body;

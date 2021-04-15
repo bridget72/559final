@@ -73,6 +73,7 @@ public class CollisionProcessor {
 			 * Minv has (1/mass 1/mass 1/inertia 1/......) on diagonal
 			 */
 
+            
             // set up w= A lambda + b
             double[] b = new double[2*contacts.size()];
             double[] D = new double[2*contacts.size()];

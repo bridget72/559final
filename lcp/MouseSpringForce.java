@@ -3,7 +3,9 @@ package comp559.lcp;
 import javax.swing.JPanel;
 import javax.swing.border.TitledBorder;
 import javax.vecmath.Point2d;
+import javax.vecmath.Point3d;
 import javax.vecmath.Vector2d;
+import javax.vecmath.Vector3d;
 
 import mintools.parameters.DoubleParameter;
 import mintools.swing.CollapsiblePanel;
@@ -17,15 +19,15 @@ public class MouseSpringForce {
 
     private RigidBody picked = null;
     
-    private Point2d grabPointB = new Point2d();
+    private Point3d grabPointB = new Point3d();
     
-    private Point2d point;
+    private Point3d point;
     
     /**
      * Creates a new mouse spring, where the provided point will be updated with movement of the mouse
      * @param point
      */
-    public MouseSpringForce( Point2d point ) {
+    public MouseSpringForce( Point3d point ) {
         this.point = point;
     }
     
@@ -34,7 +36,7 @@ public class MouseSpringForce {
      * @param picked
      * @param grabPointB
      */
-    public void setPicked( RigidBody picked, Point2d grabPointB ) {
+    public void setPicked( RigidBody picked, Point3d grabPointB ) {
         this.picked = picked;
         this.grabPointB.set( grabPointB );        
     }
@@ -53,15 +55,16 @@ public class MouseSpringForce {
     public void apply() {
         if ( picked == null ) return;
         
-        Point2d grabPointW = new Point2d();
-        Vector2d grabPointV = new Vector2d();
+        Point3d grabPointW = new Point3d();
+        Vector3d grabPointV = new Vector3d();
+        // TODO: transform B2W inputs
         picked.transformB2W.transform( grabPointB, grabPointW );
         double distance = grabPointW.distance( point );
         double k = stiffness.getValue();
         double c = damping.getValue();
         
-        Vector2d force = new Vector2d();
-        Vector2d direction = new Vector2d();
+        Vector3d force = new Vector3d();
+        Vector3d direction = new Vector3d();
         direction.sub( point, grabPointW );
         if ( direction.lengthSquared() < 1e-3 ) return;
         direction.normalize();
