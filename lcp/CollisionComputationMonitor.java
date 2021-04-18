@@ -79,15 +79,11 @@ public class CollisionComputationMonitor {
 			
 			gl.glColor3f( 0,0,0 );
 			gl.glBegin( GL.GL_LINE_STRIP );
-			
-			gl.glVertex3d( 0,0,0 );
-			gl.glVertex3d( 0,0,1 );
-			gl.glVertex3d( 0,1,0 );
-			gl.glVertex3d( 1,0,0 );
-			
+			gl.glVertex2d( 1,0 );
+			gl.glVertex2d( 0,0 );
+			gl.glVertex2d( 0,1 );
 			gl.glEnd();
 			
-			// idk about here 
 			double maxY = (Math.floor(max*1000)+1)/1000;
 			gl.glRasterPos2d(-0.05,0.5);
 			EasyViewer.glut.glutBitmapString(GLUT.BITMAP_8_BY_13, "t" );

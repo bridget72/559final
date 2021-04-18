@@ -7,9 +7,7 @@ import com.jogamp.opengl.GLAutoDrawable;
 import no.uib.cipr.matrix.DenseMatrix;
 
 import javax.vecmath.Point2d;
-import javax.vecmath.Point3d;
 import javax.vecmath.Vector2d;
-import javax.vecmath.Vector3d;
 
 /**
  * Implementation of a contact constraint.
@@ -30,17 +28,16 @@ public class Contact {
     RigidBody body2;
     
     /** Contact normal in world coordinates */
-    Vector3d normal = new Vector3d();
+    Vector2d normal = new Vector2d();
     
     /** Position of contact point in world coordinates */
-    Point3d contactW = new Point3d();
+    Point2d contactW = new Point2d();
     
     
-    DenseMatrix J = new DenseMatrix(3, 12);
-    Point3d ra = new Point3d();
-    Point3d rb = new Point3d();
-    Vector3d tangent1 = new Vector3d();
-    Vector3d tangent2 = new Vector3d();
+    DenseMatrix J = new DenseMatrix(2, 6);
+    Point2d ra = new Point2d();
+    Point2d rb = new Point2d();
+    Vector2d tangent = new Vector2d();
     double[] m;
     
     /**
@@ -50,7 +47,7 @@ public class Contact {
      * @param contactW
      * @param normal
      */
-    public Contact( RigidBody body1, RigidBody body2, Point3d contactW, Vector3d normal ) {
+    public Contact( RigidBody body1, RigidBody body2, Point2d contactW, Vector2d normal ) {
         this.body1 = body1;
         this.body2 = body2;
         this.contactW.set( contactW );
@@ -58,64 +55,25 @@ public class Contact {
         this.m = new double[] {body1.minv, body1.minv, body1.jinv, body2.minv, body2.minv, body2.jinv};	
         index = nextContactIndex++;        
         // TODO: obj3 you may want to add code here to compute and store the contact Jacobian
-        ra.set(contactW.x - body1.x.x, contactW.y - body1.x.y, contactW.z - body1.x.z);
-        rb.set(contactW.x - body2.x.x, contactW.y - body2.x.y, contactW.z - body1.x.z);
+        ra.set(contactW.x - body1.x.x, contactW.y - body1.x.y);
+        rb.set(contactW.x - body2.x.x, contactW.y - body2.x.y);
         // Jrow1
         J.add(0, 0, -normal.x);
         J.add(0, 1, -normal.y);
-        J.add(0, 2, -normal.z);
-        
-        J.add(0, 3, -normal.z * ra.y + normal.y * ra.z);
-        J.add(0, 4,  normal.z * ra.x - normal.x * ra.z);
-        J.add(0, 5, -normal.y * ra.x + normal.x * ra.y);
-       
-        J.add(0, 6,  normal.x);
-        J.add(0, 7,  normal.y);
-        J.add(0, 8,  normal.z);
-        
-        J.add(0, 9,  normal.z * rb.y - normal.y * rb.z);
-        J.add(0,10, -normal.z * rb.x + normal.x * rb.z);
-        J.add(0,11,  normal.y * rb.x - normal.x * rb.y);
-        
-        
+        J.add(0, 2,  normal.x*ra.y - normal.y*ra.x);
+        J.add(0, 3,  normal.x);
+        J.add(0, 4,  normal.y);
+        J.add(0, 5, -normal.x*rb.y + normal.y*rb.x);
         //Jrow2
-        tangent1.set(-normal.y, normal.x, 0);
-        
-        J.add(0, 0, -tangent1.x);
-        J.add(0, 1, -tangent1.y);
-        J.add(0, 2, -tangent1.z);
-        
-        J.add(0, 3, -tangent1.z * ra.y + tangent1.y * ra.z);
-        J.add(0, 4,  tangent1.z * ra.x - tangent1.x * ra.z);
-        J.add(0, 5, -tangent1.y * ra.x + tangent1.x * ra.y);
-       
-        J.add(0, 6,  tangent1.x);
-        J.add(0, 7,  tangent1.y);
-        J.add(0, 8,  tangent1.z);
-        
-        J.add(0, 9,  tangent1.z * rb.y - tangent1.y * rb.z);
-        J.add(0,10, -tangent1.z * rb.x + tangent1.x * rb.z);
-        J.add(0,11,  tangent1.y * rb.x - tangent1.x * rb.y);
+        tangent.set(-normal.y, normal.x);
+        J.add(1, 0, -tangent.x);
+        J.add(1, 1, -tangent.y);
+        J.add(1, 2,  tangent.x*ra.y - tangent.y*ra.x);
+        J.add(1, 3,  tangent.x);
+        J.add(1, 4,  tangent.y);
+        J.add(1, 5, -tangent.x*rb.y + tangent.y*rb.x);
         
         
-        //Jrow3
-        tangent2.set(-normal.x*normal.z, -normal.y*normal.z, normal.x*normal.x + normal.y*normal.y);
-        
-        J.add(0, 0, -tangent2.x);
-        J.add(0, 1, -tangent2.y);
-        J.add(0, 2, -tangent2.z);
-        
-        J.add(0, 3, -tangent2.z * ra.y + tangent2.y * ra.z);
-        J.add(0, 4,  tangent2.z * ra.x - tangent2.x * ra.z);
-        J.add(0, 5, -tangent2.y * ra.x + tangent2.x * ra.y);
-       
-        J.add(0, 6,  tangent2.x);
-        J.add(0, 7,  tangent2.y);
-        J.add(0, 8,  tangent2.z);
-        
-        J.add(0, 9,  tangent2.z * rb.y - tangent2.y * rb.z);
-        J.add(0,10, -tangent2.z * rb.x + tangent2.x * rb.z);
-        J.add(0,11,  tangent2.y * rb.x - tangent2.x * rb.y);
     }
     
     /**
@@ -127,7 +85,7 @@ public class Contact {
         gl.glPointSize(3);
         gl.glColor3f(.7f,0,0);
         gl.glBegin( GL.GL_POINTS );
-        gl.glVertex3d(contactW.x, contactW.y, contactW.z);
+        gl.glVertex2d(contactW.x, contactW.y);
         gl.glEnd();
     }
     
@@ -143,8 +101,8 @@ public class Contact {
             gl.glLineWidth(2);
             gl.glColor4f(0,.3f,0, 0.5f);
             gl.glBegin( GL.GL_LINES );
-            gl.glVertex3d(body1.x.x, body1.x.y, body1.x.z);
-            gl.glVertex3d(body2.x.x, body2.x.y, body2.x.z);
+            gl.glVertex2d(body1.x.x, body1.x.y);
+            gl.glVertex2d(body2.x.x, body2.x.y);
             gl.glEnd();
         }
     }

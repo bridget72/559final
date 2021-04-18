@@ -11,7 +11,6 @@ import com.jogamp.opengl.GL;
 import com.jogamp.opengl.GL2;
 import com.jogamp.opengl.GLAutoDrawable;
 import javax.vecmath.Point2d;
-import javax.vecmath.Point3d;
 
 /**
  * Circular disc for collision processing
@@ -100,7 +99,7 @@ public class Disc {
      * @param pW query point in world coordinates
      * @return true if point is in the disc
      */
-    public boolean isInDisc( Point3d pW ) {
+    public boolean isInDisc( Point2d pW ) {
         body.transformB2W.transform(cB, cW);
         return ( pW.distanceSquared( cW ) < r*r );
     }

@@ -3,9 +3,7 @@ package comp559.lcp;
 import javax.swing.JPanel;
 import javax.swing.border.TitledBorder;
 import javax.vecmath.Point2d;
-import javax.vecmath.Point3d;
 import javax.vecmath.Vector2d;
-import javax.vecmath.Vector3d;
 
 import mintools.parameters.DoubleParameter;
 import mintools.swing.CollapsiblePanel;
@@ -19,15 +17,15 @@ public class MouseSpringForce {
 
     private RigidBody picked = null;
     
-    private Point3d grabPointB = new Point3d();
+    private Point2d grabPointB = new Point2d();
     
-    private Point3d point;
+    private Point2d point;
     
     /**
      * Creates a new mouse spring, where the provided point will be updated with movement of the mouse
      * @param point
      */
-    public MouseSpringForce( Point3d point ) {
+    public MouseSpringForce( Point2d point ) {
         this.point = point;
     }
     
@@ -36,7 +34,7 @@ public class MouseSpringForce {
      * @param picked
      * @param grabPointB
      */
-    public void setPicked( RigidBody picked, Point3d grabPointB ) {
+    public void setPicked( RigidBody picked, Point2d grabPointB ) {
         this.picked = picked;
         this.grabPointB.set( grabPointB );        
     }
@@ -50,21 +48,20 @@ public class MouseSpringForce {
     }
     
     /**
-     * Applies the mouse spring force to the picked rigid body, or nohting if no body selected
+     * Applies the mouse spring force to the picked rigid body, or nothing if no body selected
      */
     public void apply() {
         if ( picked == null ) return;
         
-        Point3d grabPointW = new Point3d();
-        Vector3d grabPointV = new Vector3d();
-        // TODO: transform B2W inputs
+        Point2d grabPointW = new Point2d();
+        Vector2d grabPointV = new Vector2d();
         picked.transformB2W.transform( grabPointB, grabPointW );
         double distance = grabPointW.distance( point );
         double k = stiffness.getValue();
         double c = damping.getValue();
         
-        Vector3d force = new Vector3d();
-        Vector3d direction = new Vector3d();
+        Vector2d force = new Vector2d();
+        Vector2d direction = new Vector2d();
         direction.sub( point, grabPointW );
         if ( direction.lengthSquared() < 1e-3 ) return;
         direction.normalize();
