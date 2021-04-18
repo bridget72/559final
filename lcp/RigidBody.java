@@ -126,6 +126,8 @@ public class RigidBody {
             minv = 1/massLinear;
             jinv = 1/massAngular;
         }
+    
+        
         
         // set our index
         index = nextIndex++;
@@ -150,6 +152,7 @@ public class RigidBody {
         // We do need our own bounding volumes!  can't share!
         root = new BVNode( boundaryBlocks, this );        
         pinned = body.pinned;
+        sleep = body.sleep;
         minv = body.minv;
         //System.out.println(minv);
         jinv = body.jinv;

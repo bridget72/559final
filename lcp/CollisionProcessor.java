@@ -317,8 +317,9 @@ public class CollisionProcessor {
 		double threshold = separationVelocityThreshold.getValue();
 		boolean useSpring = enableContactSpring.getValue();
 		boolean useDamping = enableContactDamping.getValue();
+		double kineticEnergyThres = 1e-1;
 		//System.out.println(body1.getKineticEnergy()+" "+body2.getKineticEnergy());
-		if(body1.getKineticEnergy()>=1 || body2.getKineticEnergy()>=1) {
+		if(body1.getKineticEnergy()>=kineticEnergyThres || body2.getKineticEnergy()>=kineticEnergyThres) {
 			body1.transformB2W.transform(b1.pB, tmp1);
 			body2.transformB2W.transform(b2.pB, tmp2);
 			double distance = tmp1.distance(tmp2);
@@ -362,9 +363,9 @@ public class CollisionProcessor {
 			body1.sleep = false;
 			body2.sleep = false;
 	    }
-		else if(body1.getKineticEnergy()<1) {
+		else if(body1.getKineticEnergy()<kineticEnergyThres) {
 			body1.sleep = true;
-		}else if(body2.getKineticEnergy()<1) {
+		}else if(body2.getKineticEnergy()<kineticEnergyThres) {
 			body2.sleep = true;
 		}
 	}
