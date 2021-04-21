@@ -2,6 +2,7 @@ package comp559.lcp;
 //Agnes Liu 260713093
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 import java.lang.Math;
 import java.util.Collections;
 import java.util.HashMap;
@@ -81,8 +82,17 @@ public class CollisionProcessor {
             	double [] f = new double[] {b1.force.x, b1.force.y, b1.torque, b2.force.x, b2.force.y, b2.torque};
             	double [] m = new double[] {b1.minv, b1.minv, b1.jinv, b2.minv, b2.minv, b2.jinv};
             	
+                double distance = (b1.x.x-b2.x.x)*(b1.x.x-b2.x.x)+(b1.x.y-b2.x.y)*(b1.x.y-b2.x.y);
+                double interpenetration = distance - Block.radius * 2; // a negative quantity
+            	
+            	
+            	double baum = 0;
+            	if(ifBaumgarte.getValue()) {
+            		baum = BaumgarteK.getValue();
+            	}
+            	
             	for (int j=0;j<u.length;j++) {
-            		b[2*i]+=c.J1[j]*(bounce*u[j]+u[j]+dt*f[j]*m[j]);
+            		b[2*i]+=c.J1[j]*(bounce*u[j]+u[j]+dt*f[j]*m[j]+1e-7*baum*interpenetration);
             		b[2*i+1]+=c.J2[j]*(u[j]+dt*f[j]*m[j]);
 //            		Dii = Ji0^2*mAinv + ji1^2*mAinv + ji2^2*jAinv +...
             		Dii[2*i]+=c.J1[j]*c.J1[j]*m[j];
@@ -113,9 +123,13 @@ public class CollisionProcessor {
 	        		int j = c.index;
 //	        	lambda_i_new = lambda_i + (-b-J*v)/Dii
 	        		double lKplus1 = -b[2*j]/Dii[2*j] + lambda[2*j];
+	        		double complianceVal = 0;
+	        		if(ifCompliance.getValue()) {
+	        			complianceVal = compliance.getValue();	
+	        		}
 					for (int k = 0; k < 3; k ++) {
-						lKplus1 -= c.J1[k] * deltaV[3* c.body1.index + k] / Dii[2*j];
-						lKplus1 -= c.J1[k + 3]  * deltaV[3* c.body2.index+k]/ Dii[2*j];
+						lKplus1 -= c.J1[k] * deltaV[3* c.body1.index + k] / (Dii[2*j]+complianceVal);
+						lKplus1 -= c.J1[k + 3]  * deltaV[3* c.body2.index+k]/ (Dii[2*j]+complianceVal);
 					}
 					lKplus1 = Math.max(0,lKplus1);
 	        		double delLamb = lKplus1 - lambda[2*j];
@@ -132,8 +146,8 @@ public class CollisionProcessor {
 	        		
 	        		double lambFric = -b[2*j+1]/Dii[2*j+1] + lambda[2*j+1];
 	        		for (int k = 0; k < 3; k ++) {
-	        			lambFric -= c.J2[k] * deltaV[3*c.body1.index+k] / Dii[2*j+1];
-	        			lambFric -= c.J2[k+3]  * deltaV[3*c.body2.index+k]/ Dii[2*j+1];
+	        			lambFric -= c.J2[k] * deltaV[3*c.body1.index+k] / (Dii[2*j+1]+complianceVal);
+	        			lambFric -= c.J2[k+3]  * deltaV[3*c.body2.index+k]/(Dii[2*j+1]+complianceVal);
 					}
 //	        		projection
 	        		lambFric = Math.max(lambFric, -high);
@@ -187,12 +201,24 @@ public class CollisionProcessor {
     private void broadPhase() {
         // Naive n squared body test.. might not be that bad for small number of bodies 
         visitID++;
+        double kineticEnergyThres = 1e-1;
         if(!SpatialHash.getValue()) {
         	for ( RigidBody b1 : bodies ) {
         		for ( RigidBody b2 : bodies ) { // not so inefficient given the continue on the next line
         			if ( b1.index >= b2.index ) continue;
         			if ((b1.pinned || b1.sleep) && (b2.pinned || b2.sleep)) continue;        
-        			narrowPhase( b1, b2 );                
+        			narrowPhase( b1, b2 );  
+        			
+					/*
+					 * if(b1.pinned==false&&b2.pinned == false&& b1.getKineticEnergy() <
+					 * kineticEnergyThres && b2.getKineticEnergy() >= kineticEnergyThres) { b1.omega
+					 * -= 1e-1*b1.omega; b1.v.x += 1e-1*b1.v.x; b1.v.y += 1e-1*b1.v.y; }
+					 * if(b1.pinned==false&&b2.pinned == false&& b2.getKineticEnergy() <
+					 * kineticEnergyThres && b1.getKineticEnergy()>=kineticEnergyThres) { b2.omega
+					 * += 1e-1*b2.omega; b2.v.x += 1e-1*b2.v.x; b2.v.y += 1e-1*b2.v.y; }
+					 */
+        			
+        			
         		}
         	}
         }
@@ -220,18 +246,36 @@ public class CollisionProcessor {
      * @param body2
      */
     private void narrowPhase( RigidBody body1, RigidBody body2 ) {
-        if ( ! useBVTree.getValue() ) {
-            for ( Block b1 : body1.blocks ) {
-                for ( Block b2 : body2.blocks ) {
-                    processCollision( body1, b1, body2, b2 );
+    	double kineticEnergyThres = 1e-1;
+        if (body1.getKineticEnergy() >= kineticEnergyThres || body2.getKineticEnergy() >= kineticEnergyThres) {
+
+        	if ( ! useBVTree.getValue() ) {
+                for ( Block b1 : body1.blocks ) {
+                    for ( Block b2 : body2.blocks ) {
+                        processCollision( body1, b1, body2, b2 );
+                    }
                 }
+            } else {
+                // object 2
+            	//TODO: implement code to use hierarchical collision detection on body pairs
+            	detection (body1,body2,body1.root,body2.root);
             }
-        } else {
-            // object 2
-        	//TODO: implement code to use hierarchical collision detection on body pairs
-        	detection (body1,body2,body1.root,body2.root);
-        }
-    }
+        	
+        	body1.sleep = false;
+    		body2.sleep = false;
+        	} else if (body1.getKineticEnergy() < kineticEnergyThres) {
+        		body1.sleep = true;
+			/*
+			 * body1.v.x = 0; body1.v.y = 0;
+			 */
+        	} else if (body2.getKineticEnergy() < kineticEnergyThres) {
+        		body2.sleep = true;
+			/*
+			 * body2.v.x = 0; body2.v.y = 0;
+			 */
+        }  
+        
+    } 
     //traverse recursively
     public void detection(RigidBody body1, RigidBody body2, BVNode bn1, BVNode bn2) {
     	Disc first = bn1.boundingDisc;    	
@@ -311,9 +355,9 @@ public class CollisionProcessor {
         double threshold = separationVelocityThreshold.getValue();
         boolean useSpring = enableContactSpring.getValue();
         boolean useDamping = enableContactDamping.getValue();
-        double kineticEnergyThres = 1e-1;
+      //double kineticEnergyThres = 1e-1;
         
-        if (body1.getKineticEnergy() >= kineticEnergyThres || body2.getKineticEnergy() >= kineticEnergyThres) {
+      //if (body1.getKineticEnergy() >= kineticEnergyThres || body2.getKineticEnergy() >= kineticEnergyThres) {
 			body1.transformB2W.transform(b1.pB, tmp1);
 			body2.transformB2W.transform(b2.pB, tmp2);
 			double distance = tmp1.distance(tmp2);
@@ -353,13 +397,14 @@ public class CollisionProcessor {
 	                }
 	            }
 	        }
+	      /*  }
         body1.sleep = false;
 		body2.sleep = false;
     	} else if (body1.getKineticEnergy() < kineticEnergyThres) {
     		body1.sleep = true;
     	} else if (body2.getKineticEnergy() < kineticEnergyThres) {
     		body2.sleep = true;
-    	}
+    	}*/
     }
    
     /** Stiffness of the contact penalty spring */
@@ -386,6 +431,14 @@ public class CollisionProcessor {
     /** Number of iterations to use in projected Gauss Seidel solve */
     public IntParameter iterations = new IntParameter("iterations for GS solve", 10, 1, 500);
     
+    public BooleanParameter ifBaumgarte= new BooleanParameter("use Baumgarte", true );
+    
+    public DoubleParameter BaumgarteK = new DoubleParameter("BaumgarteK", 0.5, 0, 10 );
+    
+	public BooleanParameter ifCompliance = new BooleanParameter("use compliance", true );
+	
+	public DoubleParameter compliance = new DoubleParameter("compliance", 1e-3, 1e-10, 1  );
+    
     /** Flag for switching between penalty based contact and contact constraints */
     private BooleanParameter doLCP = new BooleanParameter( "do LCP solve", false );
     
@@ -397,6 +450,8 @@ public class CollisionProcessor {
     private BooleanParameter warmStart = new BooleanParameter ("warm start", false);
     
     public BooleanParameter SpatialHash = new BooleanParameter ("Spatial Hash for Broad Phase",false);
+    
+    
     /**
      * @return controls for the collision processor
      */
@@ -411,6 +466,7 @@ public class CollisionProcessor {
         vfp.add( restitution.getSliderControls(false) );
         vfp.add( friction.getSliderControls(false) );
         vfp.add(SpatialHash.getControls());
+
         VerticalFlowPanel vfp2 = new VerticalFlowPanel();
         vfp2.setBorder( new TitledBorder("penalty method controls") );
         vfp2.add( contactSpringStiffness.getSliderControls(true) );
@@ -418,6 +474,11 @@ public class CollisionProcessor {
         vfp2.add( separationVelocityThreshold.getSliderControls( true ) );
         vfp2.add( enableContactDamping.getControls() );
         vfp2.add( enableContactSpring.getControls() );
+
+        vfp.add( ifCompliance.getControls() );
+		vfp.add( compliance.getSliderControls(true) );  
+		vfp.add( ifBaumgarte.getControls() );
+		vfp.add( BaumgarteK.getSliderControls(false) );
         
         CollapsiblePanel cp = new CollapsiblePanel(vfp2.getPanel());
         cp.collapse();

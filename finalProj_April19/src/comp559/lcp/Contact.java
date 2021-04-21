@@ -32,20 +32,24 @@ public class Contact {
     Point2d contactW = new Point2d();
     
     Vector2d tangent = new Vector2d();
+    
     double[] J1 = new double[6];
     double[] J2 = new double[6];
+
     /**
      * Creates a new contact, and assigns it an index
      * @param body1
      * @param body2
      * @param contactW
      * @param normal
+     * @param negViolation
      */
-    public Contact( RigidBody body1, RigidBody body2, Point2d contactW, Vector2d normal ) {
+    public Contact( RigidBody body1, RigidBody body2, Point2d contactW, Vector2d normal) {
         this.body1 = body1;
         this.body2 = body2;
         this.contactW.set( contactW );
-        this.normal.set( normal );        
+        this.normal.set( normal );    
+        
         index = nextContactIndex++;        
         // objective 3 TODO: you may want to add code here to compute and store the contact Jacobian
 //        tangent perp norm

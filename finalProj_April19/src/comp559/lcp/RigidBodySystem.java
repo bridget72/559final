@@ -118,9 +118,10 @@ public class RigidBodySystem {
 	//         we identify its cell and add to the SpHash 
             if(collisionProcessor.SpatialHash.getValue()) {
             	int key = 0;
-            	if(b.pinned) {
+            	//TODO: check here 
+            	if(b.pinned||b.sleep) {
 	        		for(Block bl : b.boundaryBlocks) {
-	        			key = (int)(Math.floor(bl.j/width) + Math.floor(((bl.i-1)/width*numPerRow)));
+	        			key = (int)(Math.floor(bl.j/(imageWidth/numPerRow)) + Math.floor((bl.i-1)/imageHeight));
 	//        			if(SHvisitID[key]!=collisionProcessor.visitID) {
 	//        				SpHash.remove(key);
 	        			if (SpHash.containsKey(key)) {
@@ -139,7 +140,7 @@ public class RigidBodySystem {
 	        	 * **
 	        	 */
             	}else {
-        			key = (int)(Math.floor(b.x.x/width) + Math.floor(((b.x.y-1)/width*numPerRow)));
+        			key = (int)(Math.floor(b.x.x/(imageWidth/numPerRow)) + Math.floor((b.x.y-1)/imageHeight));
 //        			if(SHvisitID[key]!=collisionProcessor.visitID) {
 //        				SpHash.remove(key);
         			if (SpHash.containsKey(key)) {

@@ -51,6 +51,12 @@ public class Block {
         return 1 - (0.3 * c.x + 0.59 * c.y + 0.11 * c.z);
     }
     
+	/*
+	 * public void changeColor() {
+	 * this.c.set((float)Math.random(),(float)Math.random(),(float)Math.random());
+	 * 
+	 * }
+	 */
     /**
      * Draws the block in its body coordinates.
      * @param drawable
@@ -58,6 +64,15 @@ public class Block {
     public void display( GLAutoDrawable drawable ) {
         GL2 gl = drawable.getGL().getGL2();
         gl.glColor4f( c.x, c.y, c.z, alpha );
+		
+		/*
+		 * if(c.x == c.y && c.x < c.z) { gl.glColor4f( c.x, c.y, c.z, alpha ); }else {
+		 * float rand = (float)Math.random(); gl.glColor4f(
+		 * rand,rand+0.1f,(float)Math.random(), alpha ); }
+		 */
+		 
+        
+        //gl.glColor4f( (float)Math.random(),(float)Math.random(),(float)Math.random(), alpha );
         gl.glBegin(GL.GL_TRIANGLE_STRIP);
         double h = 0.5;
         gl.glVertex2d( pB.x - h, pB.y - h );
