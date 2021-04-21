@@ -84,13 +84,14 @@ public class LCPApp implements SceneGraphNode, Interactor {
      
     @Override
     public void init(GLAutoDrawable drawable) {
-        GL2 gl = drawable.getGL().getGL2();
+        GL gl = drawable.getGL();
         gl.glEnable( GL.GL_BLEND );
         gl.glBlendFunc( GL.GL_SRC_ALPHA, GL.GL_ONE_MINUS_SRC_ALPHA );
         gl.glEnable( GL.GL_LINE_SMOOTH );
         gl.glEnable( GL2.GL_POINT_SMOOTH );
         gl.glDisable( GL2.GL_LIGHTING );
         gl.glClearColor(1,1,1,1);
+        gl.glEnable(GL.GL_CULL_FACE);
     }
                 
     private FlatMatrix4d T = new FlatMatrix4d();
@@ -282,7 +283,7 @@ public class LCPApp implements SceneGraphNode, Interactor {
     				temp = eachBlock[4];
     				Float cz = Float.parseFloat(temp.substring(0,temp.length()-1));
     				eachc.set(cx,cy,cz);
-    				Block block = new Block(eachi,eachj,eachc,1);
+    				Block block = new Block(eachi,eachj,eachc,0);
     				blocks.add(block);
     			}
     			System.out.println("blocks size =" +blocks.size());
@@ -301,7 +302,7 @@ public class LCPApp implements SceneGraphNode, Interactor {
     				temp = eachBlock[4];
     				Float cz = Float.parseFloat(temp.substring(0,temp.length()-1));
     				eachc.set(cx,cy,cz);
-    				Block block = new Block(eachi,eachj,eachc,1);
+    				Block block = new Block(eachi,eachj,eachc,0);
     				boundaryBlocks.add(block);
     			}
     			System.out.println("boundary blocks size =" +boundaryBlocks.size());

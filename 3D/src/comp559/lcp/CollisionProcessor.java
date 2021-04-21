@@ -67,25 +67,30 @@ public class CollisionProcessor {
             double mu = friction.getValue();
             // obj 3
             //TODO: Compute velocity update with iterative solve of contact constraint matrix.
-            double[] lambda = new double[contacts.size()*6];
+            double[] lambda = new double[contacts.size()*3];
             double[] b = new double[lambda.length];
             double[] Dii = new double [lambda.length];
-            double[] deltaV = new double [3*bodies.size()];
+            double[] deltaV = new double [6*bodies.size()];
             for (Contact c : contacts) {
             	RigidBody b1 = c.body1;
             	RigidBody b2 = c.body2;
             	int i = c.index;
             	//b = J*(u + dt*minv*force)
-            	double [] u = new double[6]; //{b1.v.x, b1.v.y, b1.omega, b2.v.x,b2.v.y,b2.omega};
-            	double [] f = new double[6];// {b1.force.x, b1.force.y, b1.torque, b2.force.x, b2.force.y, b2.torque};
-            	double [] m = new double[6];// {b1.minv, b1.minv, b1.jinv, b2.minv, b2.minv, b2.jinv};
+            	double [] u = new double[]{b1.v.x, b1.v.y, b1.v.z, b1.omega.x,b1.omega.y,b1.omega.z, 
+            							b2.v.x,b2.v.y,b2.v.z,b2.omega.x,b2.omega.y,b2.omega.z};
+            	double [] f = new double[]{b1.force.x, b1.force.y,b1.force.z, b1.torque.x,b1.torque.y,b1.torque.z, 
+            							b2.force.x, b2.force.y, b2.force.z,b2.torque.x,b2.torque.y,b2.torque.z};
+            	double [] m = new double[] {b1.minv, b1.minv, b1.minv, b1.jinv,b1.jinv,b1.jinv,
+            			b2.minv, b2.minv,b2.minv, b2.jinv,b2.jinv,b2.jinv};
             	
             	for (int j=0;j<u.length;j++) {
             		b[2*i]+=c.J1[j]*(bounce*u[j]+u[j]+dt*f[j]*m[j]);
             		b[2*i+1]+=c.J2[j]*(u[j]+dt*f[j]*m[j]);
+            		b[2*i+2]+=c.J3[j]*(u[j]+dt*f[j]*m[j]);
             		//Dii = Ji0^2*mAinv + ji1^2*mAinv + ji2^2*jAinv +...
             		Dii[2*i]+=c.J1[j]*c.J1[j]*m[j];
             		Dii[2*i+1]+=c.J2[j]*c.J2[j]*m[j];
+            		Dii[2*i+2]+=c.J3[j]*c.J3[j]*m[j];
             	}
             	Point3d pB1 = new Point3d();
     			Point3d pB2 = new Point3d();
@@ -100,6 +105,7 @@ public class CollisionProcessor {
     				for (int k=0;k<3;k++) {
 	        			deltaV[3*b1.index+k] +=m[k]*c.J1[k]*b1.nHash.get(pB1)[1];
 	        			deltaV[3*b1.index+k] +=m[k]*c.J2[k]*b1.tHash.get(pB1)[1];
+	        			
 	        			deltaV[3*b2.index+k] +=m[k+3]*c.J1[k+3]*b1.nHash.get(pB1)[1];
 	        			deltaV[3*b2.index+k] +=m[k+3]*c.J2[k+3]*b1.tHash.get(pB1)[1];
         			}
@@ -122,11 +128,12 @@ public class CollisionProcessor {
 	        		double high = mu*lKplus1;
 	        		
 	        		//update deltaV = minv*J*delta_Lambda
-	        		double [] m = new double[] {c.body1.minv, c.body1.minv, c.body1.jinv, c.body2.minv, c.body2.minv, c.body2.jinv};
+	        		double [] m = new double[] {c.body1.minv, c.body1.minv, c.body1.minv, c.body1.jinv,c.body1.jinv,c.body1.jinv, 
+	        				c.body2.minv, c.body2.minv,c.body2.minv, c.body2.jinv, c.body2.jinv, c.body2.jinv};
 
-	        		for (int k=0;k<3;k++) {
-	        			deltaV[3*c.body1.index+k] +=m[k]*c.J1[k]*delLamb;
-	        			deltaV[3*c.body2.index+k] +=m[k+3]*c.J1[k+3]*delLamb;
+	        		for (int k=0;k<6;k++) {
+	        			deltaV[2*c.body1.index+k] +=m[k]*c.J1[k]*delLamb;
+	        			deltaV[2*c.body2.index+k] +=m[k+3]*c.J1[k+3]*delLamb;
 	        		}
 	        		
 	        		double lambFric = -b[2*j+1]/Dii[2*j+1] + lambda[2*j+1];
@@ -140,9 +147,25 @@ public class CollisionProcessor {
 	        		double delLamb2 = lambFric - lambda[2*j+1];
 	        		lambda[2*j+1] = lambFric;
 
-	        		for (int k=0;k<3;k++) {
+	        		for (int k=0;k<6;k++) {
 	        			deltaV[3*c.body1.index+k] +=m[k]*c.J2[k]*delLamb2;
 	        			deltaV[3*c.body2.index+k] +=m[k+3]*c.J2[k+3]*delLamb2;
+	        		}
+	        		
+	        		double f3 = -b[2*j+1]/Dii[2*j+1] + lambda[2*j+1];
+	        		for (int k = 0; k < 3; k ++) {
+	        			f3 -= c.J2[k] * deltaV[3*c.body1.index+k] / Dii[2*j+1];
+	        			f3 -= c.J2[k+3]  * deltaV[3*c.body2.index+k]/ Dii[2*j+1];
+					}
+	        		//projection
+	        		f3 = Math.max(f3, -high);
+	        		f3 = Math.min(f3, high);
+	        		double delLamb3 = f3 - lambda[2*j+1];
+	        		lambda[2*j+2] = f3;
+
+	        		for (int k=0;k<6;k++) {
+	        			deltaV[3*c.body1.index+k] +=m[k]*c.J3[k]*delLamb3;
+	        			deltaV[3*c.body2.index+k] +=m[k+3]*c.J3[k+3]*delLamb3;
 	        		}
 	        		if(i==iterations.getValue()-1 && warmStart.getValue()) {
 	        			//last iteration I update the lambda hash and position hash
@@ -171,7 +194,10 @@ public class CollisionProcessor {
 	        	int i = bd.index;
 	        	bd.v.x += deltaV[3*i];
 	        	bd.v.y += deltaV[3*i+1];
-//	        	bd.omega += deltaV[3*i+2];
+	        	bd.v.z += deltaV[3*i+2];
+	        	bd.omega.x += deltaV[3*i+3];
+	        	bd.omega.y += deltaV[3*i+4];
+	        	bd.omega.z += deltaV[3*i+5];
 	        }
 //	        SpHash = new HashMap<>();
             collisionSolveTime = (System.nanoTime() - now) * 1e-9;

@@ -35,33 +35,29 @@ public class RigidTransform {
      * @param theta
      * @param p
      */
-    public void set( Vector3d theta, Tuple3d p, Matrix3d th ) {
+    public void set( Vector3d theta, Tuple3d p, Matrix3d th) {
+    	Matrix3d rot = getRotation(theta,th);
+        T.set(rot);
+        
+        T.m03 = p.x;
+        T.m13 = p.y;
+        T.m23 = p.z;
+        T.m33 = 1;
+        //not sure
+//        T.mul(Tx,Ty);
+//        T.mul(T,Tz);
+
+    }
+    public Matrix3d getRotation(Vector3d theta, Matrix3d th) {
     	double cx = Math.cos(theta.x);
         double sx = Math.sin(theta.x);
-//        Matrix4d Tx = new Matrix4d();
-        //rotation about x
-//        Tx.m00 = 1; Tx.m01 =  0;  Tx.m02 = 0;    Tx.m03 = p.x;
-//        Tx.m10 = 0; Tx.m11 =  cx; Tx.m12 = -sx;  Tx.m13 = p.y;
-//        Tx.m10 = 0; Tx.m11 =  sx; Tx.m12 = cx;   Tx.m33 = p.z;
-//        Tx.m30 = 0; Tx.m31 =  0;  Tx.m33 = 0;    Tx.m33 = 1;
         
         double cy = Math.cos(theta.y);
         double sy = Math.sin(theta.y);
-//        Matrix4d Ty = new Matrix4d();
-        //rotation about y 
-//        Ty.m00 = cy; Ty.m01 =  0; Ty.m02 = sy;   Ty.m03 = p.x;
-//        Ty.m10 = 0;  Ty.m11 =  1; Ty.m12 = 0;    Ty.m13 = p.y;
-//        Ty.m10 = -sy;Ty.m11 =  0; Ty.m12 = cy;   Ty.m33 = p.z;
-//        Ty.m30 = 0;  Ty.m31 =  0; Ty.m33 = 0;    Ty.m33 = 1;
         
         double cz = Math.cos(theta.z);
         double sz = Math.sin(theta.z);
-//        Matrix4d Tz = new Matrix4d();
-//        //rotation about z 
-//        Tz.m00 = cz; Tz.m01 = -sz; Tz.m02 = 0;   Tz.m03 = p.x;
-//        Tz.m10 = sz; Tz.m11 =  cz; Tz.m12 = 0;   Tz.m13 = p.y;
-//        Tz.m10 = 0;  Tz.m11 =  0;  Tz.m12 = 1;   Tz.m33 = p.z;
-//        Tz.m30 = 0;  Tz.m31 =  0;  Tz.m33 = 0;   Tz.m33 = 1;
+
         Matrix3d rot = new Matrix3d (1.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,1.0);
 //        double sx = Math.sin(theta.x);
         Matrix3d sin = new Matrix3d(sx,0.0,0.0,sy,0.0,0.0,sz,0.0,0.0);
@@ -74,17 +70,17 @@ public class RigidTransform {
         second.mul(th);
         second.mul(cos);
         rot.add(second);
-        T.set(rot);
-        T.m03 = p.x;
-        T.m13 = p.y;
-        T.m23 = p.z;
-        T.m33 = 1;
-        //not sure
-//        T.mul(Tx,Ty);
-//        T.mul(T,Tz);
-
+        return rot;
     }
-    
+    public double getTheta (Vector3d theta, Matrix3d th) {
+    	Matrix3d rotation = getRotation (theta, th);
+    	double thed = rotation.m00+rotation.m11+rotation.m22;
+    	System.out.println("trace value is "+thed);
+    	thed = ((thed%180-1)/2)/180*Math.PI;
+    	System.out.println("angle in acos transferred to radian is "+thed);
+    	thed = Math.acos(thed);
+    	return thed;
+    }
     /**
      * Inverts this transformation
      */

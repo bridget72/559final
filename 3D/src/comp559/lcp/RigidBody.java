@@ -12,6 +12,7 @@ import javax.vecmath.Point2d;
 import javax.vecmath.Point3d;
 import javax.vecmath.Vector3d;
 import javax.vecmath.Matrix3d;
+import javax.vecmath.Matrix4d;
 
 /**
  * Simple 2D rigid body based on image samples
@@ -76,7 +77,9 @@ public class RigidBody {
     
     /** orientation angle in radians */
     public Vector3d theta = new Vector3d();
-    
+    /**for gl drawing */
+    public Vector3d rotAxis = new Vector3d();
+    public double thed = 0.0;
     /** angular velocity in radians per second */
     public Vector3d omega = new Vector3d();
 
@@ -218,15 +221,20 @@ public class RigidBody {
         //obj1 TODO: Compute the torque applied to the body 
         //take z component of cross product: cz = rxfy-ryfx
         r.set(contactPointW.x - x.x, contactPointW.y - x.y,contactPointW.z -x.z);
-        torque.set(  force.z * r.y - force.y * r.z,
-    			-force.z * r.x + force.x * r.z, 
-    			 force.y * r.x - force.x * r.y); 
-        torqhat.m01 = -torque.z;
-        torqhat.m02 = torque.y;
-        torqhat.m10 = torque.z;
-        torqhat.m12 = -torque.x;
-        torqhat.m20 = -torque.y;
-        torqhat.m21 = torque.x; 
+        torque.cross(new Vector3d(r.x,r.y,r.z), force);
+//        torque.set(  force.z * r.y - force.y * r.z,
+//    			-force.z * r.x + force.x * r.z, 
+//    			 force.y * r.x - force.x * r.y); 
+        
+        Vector3d tq = new Vector3d (torque);
+        tq.normalize();
+        torqhat.m01 = -tq.z;
+        torqhat.m02 = tq.y;
+        torqhat.m10 = tq.z;
+        torqhat.m12 = -tq.x;
+        torqhat.m20 = -tq.y;
+        torqhat.m21 = tq.x; 
+
         
     }
     
@@ -253,6 +261,8 @@ public class RigidBody {
             x.x += v.x * dt;
             x.y += v.y * dt;
             x.z += v.z * dt;
+            rotAxis.set(torque);
+            thed = transformB2W.getTheta(theta, torqhat);
             updateTransformations();
         }        
         force.set(0,0,0);
@@ -356,10 +366,12 @@ public class RigidBody {
     public void display( GLAutoDrawable drawable ) {
         GL2 gl = drawable.getGL().getGL2();
         gl.glPushMatrix();
-        gl.glTranslated( x.x, x.y, 0 );
-        gl.glRotated(theta.x*180/Math.PI, 1,0,0);
-        gl.glRotated(theta.y*180/Math.PI, 0,1,0);
-        gl.glRotated(theta.z*180/Math.PI, 0,0,1);
+        gl.glTranslated( x.x, x.y,x.z);
+        System.out.println("torque x value is "+rotAxis.x);
+        System.out.println("torque y value is "+rotAxis.y);
+        System.out.println("torque z value is "+rotAxis.z);
+        System.out.println("theta value is "+thed);
+        gl.glRotated(thed, rotAxis.x,rotAxis.y,rotAxis.z);
         if ( myListID == -1 ) {
             Integer ID = mapBlocksToDisplayList.get(blocks);
             if ( ID == null ) {
@@ -393,23 +405,23 @@ public class RigidBody {
             gl.glPointSize(8);
             gl.glColor3f(0,0,0.7f);
             gl.glBegin( GL.GL_POINTS );
-            gl.glVertex2d(x.x, x.y);
+            gl.glVertex3d(x.x, x.y,x.z);
             gl.glEnd();
             gl.glPointSize(4);
             gl.glColor3f(1,1,1);
             gl.glBegin( GL.GL_POINTS );
-            gl.glVertex2d(x.x, x.y);
+            gl.glVertex3d(x.x, x.y,x.z);
             gl.glEnd();
         } else {
             gl.glPointSize(8);
             gl.glColor3f(0,0,0.7f);
             gl.glBegin( GL.GL_POINTS );
-            gl.glVertex2d(x.x, x.y);
+            gl.glVertex3d(x.x, x.y,x.z);
             gl.glEnd();
             gl.glPointSize(4);
             gl.glColor3f(0,0,1);
             gl.glBegin( GL.GL_POINTS );
-            gl.glVertex2d(x.x, x.y);
+            gl.glVertex3d(x.x, x.y,x.z);
             gl.glEnd();
         }
     }

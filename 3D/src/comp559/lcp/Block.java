@@ -64,14 +64,10 @@ public class Block {
         gl.glColor4f( c.x, c.y, c.z, alpha );
         gl.glBegin(GL.GL_TRIANGLE_STRIP);
         double h = 0.5;
-        gl.glVertex3d( pB.x - h, pB.y - h, pB.z - h);
-        gl.glVertex3d( pB.x - h, pB.y - h, pB.z + h);
-        gl.glVertex3d( pB.x - h, pB.y + h, pB.z - h);
-        gl.glVertex3d( pB.x - h, pB.y + h, pB.z + h);
-        gl.glVertex3d( pB.x + h, pB.y - h, pB.z - h);
-        gl.glVertex3d( pB.x + h, pB.y - h, pB.z + h);
-        gl.glVertex3d( pB.x + h, pB.y + h, pB.z - h);
-        gl.glVertex3d( pB.x + h, pB.y + h, pB.z + h);
+        gl.glVertex2d( pB.x - h, pB.y - h );
+        gl.glVertex2d( pB.x - h, pB.y + h );
+        gl.glVertex2d( pB.x + h, pB.y - h );
+        gl.glVertex2d( pB.x + h, pB.y + h );
         gl.glEnd();
     }
     

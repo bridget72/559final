@@ -57,7 +57,6 @@ public class Contact {
         //TODO: you may want to add code here to compute and store the contact Jacobian 
         ra.set(contactW.x - body1.x.x, contactW.y - body1.x.y, contactW.z - body1.x.z);
         rb.set(contactW.x - body2.x.x, contactW.y - body2.x.y, contactW.z - body1.x.z);
-        
         this.tangent1.set(-normal.y, normal.x, 0); 
         this.tangent2.set(-normal.x*normal.z, -normal.y*normal.z, normal.x*normal.x + normal.y*normal.y);
         this.J1 = new double[] {
