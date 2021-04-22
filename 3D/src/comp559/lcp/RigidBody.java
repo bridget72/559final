@@ -2,15 +2,19 @@ package comp559.lcp;
 //Agnes Liu 260713093
 import java.util.ArrayList;
 
+
 import java.util.AbstractMap;
 import java.util.HashMap;
 
 import com.jogamp.opengl.GL;
 import com.jogamp.opengl.GL2;
 import com.jogamp.opengl.GLAutoDrawable;
+import com.jogamp.opengl.glu.GLU;
+
 import javax.vecmath.Point2d;
 import javax.vecmath.Point3d;
 import javax.vecmath.Vector3d;
+import javax.vecmath.Color3f;
 import javax.vecmath.Matrix3d;
 import javax.vecmath.Matrix4d;
 
@@ -32,20 +36,25 @@ public class RigidBody {
     /** hashmap for in-contact body index*/
     HashMap<Point3d, Double[]> cHash =new HashMap<>();
     HashMap<Point3d, Double[]> nHash =new HashMap<>();
-    HashMap<Point3d, Double[]> tHash = new HashMap<>();
+    HashMap<Point3d, Double[]> tHash1 = new HashMap<>();
+    HashMap<Point3d, Double[]> tHash2 = new HashMap<>();
     
     /** Boundary blocks */
     ArrayList<Block> boundaryBlocks;
-    ArrayList<Block> spPos;    
-    BVNode root;
+    ArrayList<Point3d> vertex;
+    static float alpha;
     
+    Color3f c = new Color3f();
+    BVNode root;
+    public Renderer rend= new Renderer();
     /** accumulator for forces acting on this body */
     Vector3d force = new Vector3d();
     
     /** accumulator for torques acting on this body */
     Vector3d torque = new Vector3d();
     Matrix3d torqhat = new Matrix3d();
-    
+    public int imageWidth = 1000;
+    public int imageHeight = 1000;
     double massAngular;
     
     double massLinear;
@@ -77,9 +86,12 @@ public class RigidBody {
     
     /** orientation angle in radians */
     public Vector3d theta = new Vector3d();
+    
     /**for gl drawing */
     public Vector3d rotAxis = new Vector3d();
     public double thed = 0.0;
+    public boolean isBox = false;
+    
     /** angular velocity in radians per second */
     public Vector3d omega = new Vector3d();
 
@@ -199,7 +211,26 @@ public class RigidBody {
         // set our index
         index = nextIndex++;
     }
-    
+    /** vertex for drawing (and spatial hash?)
+     */
+    public ArrayList<Point3d> getVertex(ArrayList<Block> b){
+    	ArrayList<Point3d> vert= new ArrayList<Point3d>();
+    	int xmin = 1000000;
+    	int xmax = -100000;
+    	int ymin = 1000000;
+    	int ymax = -100000;	
+    	for (Block block :b) {
+    		if (block.j>xmax) xmax = block.j;
+    		if(block.j<xmin) xmin = block.j;
+    		if(block.i>ymax) ymax = block.i;
+    		if(block.i<ymin) ymin = block.i;
+    	}
+    	vert.add(new Point3d(xmin,ymin,0));
+    	vert.add(new Point3d(xmin,ymax,0));
+    	vert.add(new Point3d(xmax,ymin,0));
+    	vert.add(new Point3d(xmax,ymax,0));
+    	return vert;
+    }
     /**
      * Updates the B2W and W2B transformations
      */
@@ -261,7 +292,7 @@ public class RigidBody {
             x.x += v.x * dt;
             x.y += v.y * dt;
             x.z += v.z * dt;
-            rotAxis.set(torque);
+//            rotAxis.set(torque);
             thed = transformB2W.getTheta(theta, torqhat);
             updateTransformations();
         }        
@@ -335,9 +366,10 @@ public class RigidBody {
         transformW2B.invert();
     }
     public void clearHashes() {
-    	cHash = new HashMap<>();
-    	nHash = new HashMap<>();
-    	tHash = new HashMap<>();
+    	cHash.clear();
+    	nHash.clear();
+    	tHash1.clear();
+    	tHash2.clear();
     }
     
     /** Map to keep track of display list IDs for drawing our rigid bodies efficiently */
@@ -364,32 +396,52 @@ public class RigidBody {
      * @param drawable
      */
     public void display( GLAutoDrawable drawable ) {
-        GL2 gl = drawable.getGL().getGL2();
-        gl.glPushMatrix();
-        gl.glTranslated( x.x, x.y,x.z);
-        System.out.println("torque x value is "+rotAxis.x);
-        System.out.println("torque y value is "+rotAxis.y);
-        System.out.println("torque z value is "+rotAxis.z);
-        System.out.println("theta value is "+thed);
-        gl.glRotated(thed, rotAxis.x,rotAxis.y,rotAxis.z);
-        if ( myListID == -1 ) {
-            Integer ID = mapBlocksToDisplayList.get(blocks);
-            if ( ID == null ) {
-                myListID = gl.glGenLists(1);
-                gl.glNewList( myListID, GL2.GL_COMPILE_AND_EXECUTE );
-                for ( Block b : blocks ) {
-                    b.display( drawable );
-                }
-                gl.glEndList();
-                mapBlocksToDisplayList.put( blocks, myListID );
-            } else {
-                myListID = ID;
-                gl.glCallList(myListID);
-            }
-        } else {
-            gl.glCallList(myListID);
-        }
-        gl.glPopMatrix();
+    	GL2 gl = drawable.getGL().getGL2();
+    	GLU glu = new GLU();
+    	float t = 1.0f;
+    	if (!this.isBox) {
+	        gl.glPushMatrix();
+	        gl.glTranslated( x.x, x.y,x.z);
+//	        System.out.println("torqhat is "+ this.torqhat.toString());
+//	        System.out.println("torque x value is "+rotAxis.x);
+//	        System.out.println("torque y value is "+rotAxis.y);
+//	        System.out.println("torque z value is "+rotAxis.z);
+//	        System.out.println("theta value is "+thed);
+//	        gl.glRotated(thed, rotAxis.x,rotAxis.y,rotAxis.z);
+	        gl.glRotated(thed, torque.x,torque.y,torque.z);
+	        if ( myListID == -1 ) {
+	            Integer ID = mapBlocksToDisplayList.get(blocks);
+	            if ( ID == null ) {
+	                myListID = gl.glGenLists(1);
+	                gl.glNewList( myListID, GL2.GL_COMPILE_AND_EXECUTE );
+	                for ( Block b : blocks ) {
+	                    b.display( drawable );
+	                }
+	                gl.glEndList();
+	                mapBlocksToDisplayList.put( blocks, myListID );
+	            } else {
+	                myListID = ID;
+	                gl.glCallList(myListID);
+	            }
+	        } else {
+	            gl.glCallList(myListID);
+	        }
+	        gl.glPopMatrix();
+    	}
+    	else {
+    		this.vertex = getVertex(this.boundaryBlocks);
+    		this.c = this.blocks.get(0).c;
+    		gl.glPushMatrix();
+	        gl.glTranslated( x.x+10, x.y+100,x.z);
+	        gl.glRotated(thed, rotAxis.x,rotAxis.y,rotAxis.z);
+            rend.resize(drawable, imageWidth/10, imageHeight/10);
+            rend.init(drawable);
+//	        float offset = 1.0f;
+//		    rend.t += offset;
+	        rend.display(drawable,this);
+	     
+	        gl.glPopMatrix();
+    	}
     }
     
     static public double kineticEnergyThreshold = 1e-6;

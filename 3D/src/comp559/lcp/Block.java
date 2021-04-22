@@ -63,11 +63,20 @@ public class Block {
         GL2 gl = drawable.getGL().getGL2();
         gl.glColor4f( c.x, c.y, c.z, alpha );
         gl.glBegin(GL.GL_TRIANGLE_STRIP);
+//        gl.glBegin(GL2.GL_POLYGON);
         double h = 0.5;
-        gl.glVertex2d( pB.x - h, pB.y - h );
-        gl.glVertex2d( pB.x - h, pB.y + h );
-        gl.glVertex2d( pB.x + h, pB.y - h );
-        gl.glVertex2d( pB.x + h, pB.y + h );
+        gl.glVertex2d( pB.x - h, pB.y - h);
+        gl.glVertex2d( pB.x - h, pB.y + h);
+        gl.glVertex2d( pB.x + h, pB.y - h);
+        gl.glVertex2d( pB.x + h, pB.y + h);
+//        gl.glVertex3d( pB.x - h, pB.y - h,pB.z-h );
+//        gl.glVertex3d( pB.x - h, pB.y + h,pB.z-h );
+//        gl.glVertex3d( pB.x + h, pB.y - h,pB.z-h );
+//        gl.glVertex3d( pB.x + h, pB.y + h,pB.z-h );
+//        gl.glVertex3d( pB.x - h, pB.y - h,pB.z+h );
+//        gl.glVertex3d( pB.x - h, pB.y + h,pB.z+h );
+//        gl.glVertex3d( pB.x + h, pB.y - h,pB.z+h );
+//        gl.glVertex3d( pB.x + h, pB.y + h,pB.z+h );
         gl.glEnd();
     }
     

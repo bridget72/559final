@@ -265,7 +265,6 @@ public class LCPApp implements SceneGraphNode, Interactor {
     		for(int i = 0; i<numBodies ;i++ ) {
     			ArrayList<Block> blocks = new ArrayList<Block>();
     			ArrayList<Block> boundaryBlocks = new ArrayList<Block>();
-    			ArrayList<Block> spPos = new ArrayList<Block>();
     			//Blocks:
     			br.readLine();
     			String[] blockList = br.readLine().split(";");
@@ -283,7 +282,7 @@ public class LCPApp implements SceneGraphNode, Interactor {
     				temp = eachBlock[4];
     				Float cz = Float.parseFloat(temp.substring(0,temp.length()-1));
     				eachc.set(cx,cy,cz);
-    				Block block = new Block(eachi,eachj,eachc,0);
+    				Block block = new Block(eachi,eachj,eachc,1);
     				blocks.add(block);
     			}
     			System.out.println("blocks size =" +blocks.size());
@@ -302,7 +301,7 @@ public class LCPApp implements SceneGraphNode, Interactor {
     				temp = eachBlock[4];
     				Float cz = Float.parseFloat(temp.substring(0,temp.length()-1));
     				eachc.set(cx,cy,cz);
-    				Block block = new Block(eachi,eachj,eachc,0);
+    				Block block = new Block(eachi,eachj,eachc,1);
     				boundaryBlocks.add(block);
     			}
     			System.out.println("boundary blocks size =" +boundaryBlocks.size());
