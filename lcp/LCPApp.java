@@ -1,5 +1,4 @@
 package comp559.lcp;
-
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.GridLayout;
@@ -12,11 +11,16 @@ import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseMotionAdapter;
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.FilenameFilter;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 
 import com.jogamp.opengl.GL;
@@ -26,6 +30,7 @@ import javax.swing.JButton;
 import javax.swing.JPanel;
 import javax.swing.JTextField;
 import javax.swing.border.TitledBorder;
+import javax.vecmath.Color3f;
 import javax.vecmath.Matrix4d;
 import javax.vecmath.Point2d;
 import javax.vecmath.Point3d;
@@ -71,7 +76,7 @@ public class LCPApp implements SceneGraphNode, Interactor {
      */
     public LCPApp() {
         system.mouseSpring = mouseSpring;
-        loadSystem("datalcp/lcp.png"); // good default scene
+        loadSystem("datalcp/hithere.png"); // good default scene
         T.getBackingMatrix().setIdentity();
         ev = new EasyViewer( "2D Rigid Body Collision Processing", this, new Dimension(540,480), new Dimension(640,480) );
         ev.addInteractor(this);        
@@ -153,10 +158,10 @@ public class LCPApp implements SceneGraphNode, Interactor {
 
         final SimpleDateFormat formatter = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
         gl.glColor4f(0,0,0,1);
-        String text = "Bridget Liu\n" + system.name + "\n";
+        String text =  system.name + "\n";
         text += "bodies = " + system.bodies.size() + "\n";        
         text += "contacts = " + system.collisionProcessor.contacts.size() + "\n";
-        text += formatter.format( new Date() ) + "\n";
+        //text += formatter.format( new Date() ) + "\n";
         text += "simulation time = " + system.simulationTime + "\n";
         text += "total compute time = " + system.totalAccumulatedComputeTime + "\n";
         text += "compute time = " + system.computeTime + "\n";
@@ -166,6 +171,7 @@ public class LCPApp implements SceneGraphNode, Interactor {
         text += "PGS iterations = " + system.collisionProcessor.iterations.getValue() + "\n";
         text += "mu = " + system.collisionProcessor.friction.getValue() + "\n";
         text += "r = " + system.collisionProcessor.restitution.getValue() +"\n";
+        //text += "Used Spatial Hash?" + system.collisionProcessor.SpatialHash.getValue() +"\n";
         
         if ( ! hideOverlay.getValue() ) {
         	EasyViewer.printTextLines( drawable, text, 10, 10, 12, GLUT.BITMAP_HELVETICA_10 );
@@ -243,6 +249,70 @@ public class LCPApp implements SceneGraphNode, Interactor {
     /**
      * Creates a control panel for changing visualization and simulation parameters
      */
+    private void loadTxt(File f) {
+    	try {
+    		systemClear();
+    		system.name = f.toString();
+    		//System.out.println("from text");
+    		BufferedReader br = new BufferedReader(new FileReader (f));
+    		br.readLine();
+    		imageWidth = Double.parseDouble(br.readLine());
+    		br.readLine();
+    		imageHeight = Double.parseDouble(br.readLine());
+    		br.readLine();
+    		int numBodies = Integer.parseInt(br.readLine());
+    		for(int i = 0; i<numBodies ;i++ ) {
+    			ArrayList<Block> blocks = new ArrayList<Block>();
+    			ArrayList<Block> boundaryBlocks = new ArrayList<Block>();
+    			//ArrayList<Block> spPos = new ArrayList<Block>();
+    			//Blocks:
+    			br.readLine();
+    			String[] blockList = br.readLine().split(";");
+    		    int eachi = -1;
+    		    int eachj = -1;
+    			Color3f eachc = new Color3f();
+    			for(int j=0; j<blockList.length;j++) {
+    				String[] eachBlock = blockList[j].split(" ");
+    				eachi = Integer.parseInt(eachBlock[0]);
+    				eachj = Integer.parseInt(eachBlock[1]);
+    				String temp = eachBlock[2];
+    				Float cx = Float.parseFloat(temp.substring(1,temp.length()-1));
+    				temp = eachBlock[3];
+    				Float cy = Float.parseFloat(temp.substring(0,temp.length()-1));
+    				temp = eachBlock[4];
+    				Float cz = Float.parseFloat(temp.substring(0,temp.length()-1));
+    				eachc.set(cx,cy,cz);
+    				Block block = new Block(eachi,eachj,eachc);
+    				blocks.add(block);
+    			}
+    			//System.out.println("blocks size =" +blocks.size());
+    			//BoundaryBlocks:
+    			br.readLine();
+    			blockList = br.readLine().split(";");
+    			for(int j=0; j<blockList.length;j++) {
+    				String[] eachBlock = blockList[j].split(" ");
+    				eachi = Integer.parseInt(eachBlock[0]);
+    				eachj = Integer.parseInt(eachBlock[1]);
+    				String temp = eachBlock[2];
+    				Float cx = Float.parseFloat(temp.substring(1,temp.length()-1));
+    				temp = eachBlock[3];
+    				Float cy = Float.parseFloat(temp.substring(0,temp.length()-1));
+    				temp = eachBlock[4];
+    				Float cz = Float.parseFloat(temp.substring(0,temp.length()-1));
+    				eachc.set(cx,cy,cz);
+    				Block block = new Block(eachi,eachj,eachc);
+    				boundaryBlocks.add(block);
+    			}
+    			//System.out.println("boundary blocks size =" +boundaryBlocks.size());
+    			RigidBody body = new RigidBody(blocks,boundaryBlocks);
+    			system.bodies.add(body);
+    		}
+    		br.close();
+    	}catch(Exception e) {		
+    		throw new RuntimeException("Failed to load simulation input file.",e);
+    	}
+    	
+    }
     @Override
     public JPanel getControls() {
         VerticalFlowPanel vfp = new VerticalFlowPanel();
@@ -275,9 +345,75 @@ public class LCPApp implements SceneGraphNode, Interactor {
                 File f = FileSelect.select("png", "image", "load", "datalcp/", true );
                 if ( f != null ) {
                     loadSystem( f.getPath() );
+//                	loadTxt(f);
                 }
             }
         });
+        
+        JButton loadtxt = new JButton("LoadTxt");
+        basicControls.add( loadtxt );
+        loadtxt.addActionListener( new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                File f = FileSelect.select("txt", "text", "load", "datalcp/", true );
+                if ( f != null ) {
+                 	 loadTxt(f);
+                }
+            }
+        });
+        
+        JButton savetxt = new JButton("SaveTxt");
+        basicControls.add( savetxt );
+        savetxt.addActionListener( new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                File f = FileSelect.select("txt", "text", "save", "datalcp/", true );
+                if ( f != null ) {
+                	try {
+                		BufferedWriter bw = new BufferedWriter(new FileWriter(f));
+                		bw.write("imageWidth:");
+                		bw.newLine();
+                		bw.write(""+imageWidth);
+                		bw.newLine();
+                		bw.write("imageHeight:");
+                		bw.newLine();
+                		bw.write(""+imageHeight);
+                		bw.newLine();
+                		bw.write("bodies:");
+                		bw.newLine();
+                		//System.out.println(system.bodies.size());
+                		bw.write(""+system.bodies.size());
+                		bw.newLine();
+                		ArrayList<RigidBody> tempBodies = system.bodies;
+                        for( RigidBody b: tempBodies){
+                        	
+                        	bw.write("Blocks:");
+                        	bw.newLine();
+                        	ArrayList<Block> tempBlocks = b.blocks;
+                        	for(Block block: tempBlocks) {
+                        		bw.write(block.i+" "+block.j+" "+block.c+";");
+                        	}
+                        	bw.newLine();
+                        	
+                        	bw.write("BoundaryBlocks:");
+                        	bw.newLine();
+                        	ArrayList<Block> tempBoundaryBlocks = b.boundaryBlocks;
+                        	for(Block block: tempBoundaryBlocks) {
+                        		bw.write(block.i+" "+block.j+" "+block.c+";");
+                        	}
+                        	bw.newLine();
+                     }
+                		
+                    	bw.close();
+                	}catch(Exception e1) {
+                		System.out.print("Text file saving failed.");
+                	}
+                 	 
+                }
+            }
+        });
+        
+        
         vfp.add( basicControls );
         
         vfp.add( videoFileName );
@@ -308,9 +444,19 @@ public class LCPApp implements SceneGraphNode, Interactor {
         vfp.add( drawGraphs.getControls() );
         
         vfp.add( run.getControls() );
-        vfp.add( stepsize.getSliderControls(true) );
-        vfp.add( substeps.getControls() );
+
         vfp.add( system.getControls() );
+        
+        
+        
+        
+        VerticalFlowPanel vfpv1 = new VerticalFlowPanel();
+        vfpv1.setBorder( new TitledBorder("Substeps") );
+        vfpv1.add( stepsize.getSliderControls(true) );
+        vfpv1.add( substeps.getControls() );
+        CollapsiblePanel vcp1 = new CollapsiblePanel(vfpv1.getPanel());
+        vcp1.collapse();
+        vfp.add( vcp1 );
         
         vfp.add( mouseSpring.getControls() );
         
@@ -323,7 +469,16 @@ public class LCPApp implements SceneGraphNode, Interactor {
         vcp.collapse();
         vfp.add( vcp );
         
-        vfp.add( whiteEpsilon.getSliderControls(false) );
+        
+        VerticalFlowPanel vfp2 = new VerticalFlowPanel();
+        vfp2.setBorder( new TitledBorder("white epsilon") );
+        vfp2.add( whiteEpsilon.getSliderControls(false) );
+        CollapsiblePanel vcp2 = new CollapsiblePanel(vfp2.getPanel());
+        vcp2.collapse();
+        vfp.add( vcp2 );
+        
+        
+        //vfp.add( whiteEpsilon.getSliderControls(false) );
         vfp.add( factory.getControls() );
         
         return vfp.getPanel();
@@ -356,9 +511,21 @@ public class LCPApp implements SceneGraphNode, Interactor {
         systemClear();
         system.name = filename;
         ImageBlocker blocker = new ImageBlocker( filename, (float) (double) whiteEpsilon.getValue() );
+        system.SHinit(blocker.width, blocker.height);
         imageWidth = blocker.width;
         imageHeight= blocker.height;
         system.bodies.addAll(blocker.bodies);
+        
+//        System.out.println("imageWidth:");
+//        System.out.println(imageWidth);
+//        System.out.println("imageHeight:");
+//        System.out.println(imageHeight);
+//        System.out.println("bodies:");
+//        System.out.println(system.bodies.size());
+//        ArrayList<RigidBody> tempBodies = system.bodies;
+//        for( RigidBody b: tempBodies){
+//        	b.printBody();
+//        }
     }
     
     /**
@@ -370,6 +537,7 @@ public class LCPApp implements SceneGraphNode, Interactor {
         systemClear();
         system.name = filename + " factory";
         ImageBlocker blocker = new ImageBlocker( filename, (float) (double) whiteEpsilon.getValue() );
+        system.SHinit(blocker.width, blocker.height);
         imageWidth = blocker.width;
         imageHeight= blocker.height;
         factory.setImageBlocker(blocker);
@@ -419,7 +587,7 @@ public class LCPApp implements SceneGraphNode, Interactor {
         files = directory.listFiles(new FilenameFilter() {            
             @Override
             public boolean accept( File dir, String name ) {
-                return name.endsWith(".png");                
+                return name.endsWith(".txt");                
             }
         });
         java.util.Arrays.sort(files);

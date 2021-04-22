@@ -4,7 +4,7 @@ import javax.vecmath.Matrix3d;
 import javax.vecmath.Point2d;
 import javax.vecmath.Tuple2d;
 import javax.vecmath.Vector2d;
-
+//Agnes Liu 260713093
 /**
  * 2D rigid transformation
  * @author kry
@@ -48,7 +48,6 @@ public class RigidTransform {
      */
     public void invert() {
         // gross but convenient... 
-    	// System.out.println(T);
         T.invert();
     }
     

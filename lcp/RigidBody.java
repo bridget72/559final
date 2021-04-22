@@ -1,6 +1,7 @@
 package comp559.lcp;
-
+//Agnes Liu 260713093
 import java.util.ArrayList;
+import java.util.AbstractMap;
 import java.util.HashMap;
 
 import com.jogamp.opengl.GL;
@@ -17,16 +18,19 @@ public class RigidBody {
 
     /** Unique identifier for this body */
     public int index;
-    
+    /** storing lambda values of previous time step*/
     /** Variable to keep track of identifiers that can be given to rigid bodies */
     static public int nextIndex = 0;
     
     /** Block approximation of geometry */
     ArrayList<Block> blocks;
-    
+    /**hashmap for in-contact body index*/
+    HashMap<Point2d, Double[]> cHash =new HashMap<>();
+    HashMap<Point2d, Double[]> nHash =new HashMap<>();
+    HashMap<Point2d, Double[]> tHash = new HashMap<>();
     /** Boundary blocks */
     ArrayList<Block> boundaryBlocks;
-        
+    ArrayList<Block> spPos;    
     BVNode root;
     
     /** accumulator for forces acting on this body */
@@ -41,8 +45,8 @@ public class RigidBody {
         
     public boolean pinned;
     
+    public ArrayList<Integer> bucketKey = new ArrayList<Integer>();
     public boolean sleep;
-    
     /**
      * Transforms points in Body coordinates to World coordinates
      */
@@ -58,9 +62,7 @@ public class RigidBody {
     
     /** Position of center of mass in the world frame */
     public Point2d x = new Point2d();
-
     public Point2d r = new Point2d();
-    
     /** initial position of center of mass in the world frame */
     Point2d x0 = new Point2d();
     
@@ -73,7 +75,7 @@ public class RigidBody {
     /** inverse of the linear mass, or zero if pinned */
     double minv;
     
-    /** inverse of the angular mass (inertia), or zero if pinned */
+    /** inverse of the angular mass, or zero if pinned */
     double jinv;
     
     /**
@@ -81,10 +83,10 @@ public class RigidBody {
      * @param blocks
      * @param boundaryBlocks
      */
-    public RigidBody( ArrayList<Block> blocks, ArrayList<Block> boundaryBlocks ) {
+    public RigidBody( ArrayList<Block> blocks, ArrayList<Block> boundaryBlocks) {
 
         this.blocks = blocks;
-        this.boundaryBlocks = boundaryBlocks;        
+        this.boundaryBlocks = boundaryBlocks;       
         // compute the mass and center of mass position        
         for ( Block b : blocks ) {
             double mass = b.getColourMass();
@@ -92,15 +94,40 @@ public class RigidBody {
             x0.x += b.j * mass;
             x0.y += b.i * mass; 
         }
+        /**
+         * added for load text
+         */
+        for ( Block b : boundaryBlocks ) {
+            double mass = b.getColourMass();
+            massLinear += mass;            
+            x0.x += b.j * mass;
+            x0.y += b.i * mass; 
+        }
+        
         x0.scale ( 1 / massLinear );
         // set block positions in world and body coordinates 
         for ( Block b : blocks ) {
             b.pB.x = b.j - x0.x;
             b.pB.y = b.i - x0.y;
         }
+        /**
+         * added for load text
+         */
+        for ( Block b : boundaryBlocks ) {
+            b.pB.x = b.j - x0.x;
+            b.pB.y = b.i - x0.y;
+        }
+        
         // compute the rotational inertia
         final Point2d zero = new Point2d(0,0);
         for ( Block b : blocks ) {
+            double mass = b.getColourMass();
+            massAngular += mass*b.pB.distanceSquared(zero);
+        }
+        /**
+         * added for load text
+         */
+        for ( Block b : boundaryBlocks ) {
             double mass = b.getColourMass();
             massAngular += mass*b.pB.distanceSquared(zero);
         }
@@ -114,11 +141,10 @@ public class RigidBody {
         transformB2W.set( theta, x );
         transformW2B.set( theta, x );
         transformW2B.invert();
-                
+//        System.out.println("boundary blocks first pB "+boundaryBlocks.get(0).pB);
         root = new BVNode( boundaryBlocks, this );
-        
         pinned = isAllBlueBlocks();
-        
+        //pinned = isAllBlackBlocks();
         if ( pinned ) {
             minv = 0;
             jinv = 0;
@@ -126,12 +152,40 @@ public class RigidBody {
             minv = 1/massLinear;
             jinv = 1/massAngular;
         }
-    
-        
         
         // set our index
         index = nextIndex++;
     }
+    
+    /**
+     * Prints out a body
+     */
+    
+	public void printBody() {
+		/*
+		 * System.out.println("index:"); System.out.println(this.index);
+		 * System.out.println("nextIndex:"); System.out.println(this.nextIndex);
+		 */
+    	System.out.println("Blocks:");
+    	ArrayList<Block> tempBlocks = this.blocks;
+    	for(Block block: tempBlocks) {
+    		block.printBlock();
+    	}
+    	System.out.println();
+    	System.out.println("BoundaryBlocks:");
+    	ArrayList<Block> tempBoundaryBlocks = this.boundaryBlocks;
+    	for(Block block: tempBoundaryBlocks) {
+    		block.printBlock();
+    	}
+    	System.out.println();
+		/*
+		 * System.out.println("massLinear:"); System.out.println(this.massLinear);
+		 * System.out.println("massAngular:"); System.out.println(this.massAngular);
+		 * System.out.println("minv:"); System.out.println(this.minv);
+		 * System.out.println("jinv:"); System.out.println(this.jinv);
+		 */
+    }
+    
     
     /**
      * Creates a copy of the provided rigid body 
@@ -154,7 +208,6 @@ public class RigidBody {
         pinned = body.pinned;
         sleep = body.sleep;
         minv = body.minv;
-        //System.out.println(minv);
         jinv = body.jinv;
         // set our index
         index = nextIndex++;
@@ -164,6 +217,7 @@ public class RigidBody {
      * Updates the B2W and W2B transformations
      */
     public void updateTransformations() {
+        transformB2W.set( theta, x );
         transformB2W.set( theta, x );
         transformW2B.set( theta, x );
         transformW2B.invert();
@@ -177,8 +231,8 @@ public class RigidBody {
      */
     public void applyContactForceW( Point2d contactPointW, Vector2d contactForceW ) {
         force.add( contactForceW );
-        // 
-        // torque = -ryfx + rxfy
+        //obj1 TODO: Compute the torque applied to the body 
+        //take z component of cross product: cz = rxfy-ryfx
         r.set(contactPointW.x - x.x, contactPointW.y - x.y);
         torque = - r.y*force.x + r.x*force.y;
     }
@@ -191,16 +245,19 @@ public class RigidBody {
      */
     public void advanceTime( double dt ) {
         if ( !pinned && !sleep ) {            
-            // TODO: obj1 use torques to advance the angular state of the rigid body
+            //obj1 TODO: use torques to advance the angular state of the rigid body
+        	//torq = omega_dot * M_ang;
+        	//v = v(body) + pos*omega;
+//        	omega += torque/massAngular * dt;
         	omega += dt*torque*jinv;
             theta += dt*omega;
-        	
+//        	theta = omega / dt;
             v.x += 1.0 / massLinear * force.x * dt;
             v.y += 1.0 / massLinear * force.y * dt;
             x.x += v.x * dt;
             x.y += v.y * dt;
             updateTransformations();
-        }        
+        }  
         force.set(0,0);
         torque = 0;
     }
@@ -238,6 +295,15 @@ public class RigidBody {
         }
         return true;
     }
+    
+    
+    boolean isAllBlackBlocks() {
+        for ( Block b : blocks ) {
+            if ( ! (b.c.x == b.c.y && b.c.y == b.c.z) ) return false;
+        }
+        return true;
+    }
+    
 
     /**
      * Checks to see if the point intersects the body in its current position
@@ -266,6 +332,11 @@ public class RigidBody {
         transformB2W.set( theta, x );
         transformW2B.set( transformB2W );
         transformW2B.invert();
+    }
+    public void clearHashes() {
+    	cHash = new HashMap<>();
+    	nHash = new HashMap<>();
+    	tHash = new HashMap<>();
     }
     
     /** Map to keep track of display list IDs for drawing our rigid bodies efficiently */
@@ -296,22 +367,26 @@ public class RigidBody {
         gl.glPushMatrix();
         gl.glTranslated( x.x, x.y, 0 );
         gl.glRotated(theta*180/Math.PI, 0,0,1);
-        if ( myListID == -1 ) {
-            Integer ID = mapBlocksToDisplayList.get(blocks);
-            if ( ID == null ) {
-                myListID = gl.glGenLists(1);
-                gl.glNewList( myListID, GL2.GL_COMPILE_AND_EXECUTE );
-                for ( Block b : blocks ) {
-                    b.display( drawable );
-                }
-                gl.glEndList();
-                mapBlocksToDisplayList.put( blocks, myListID );
-            } else {
-                myListID = ID;
-                gl.glCallList(myListID);
-            }
-        } else {
-            gl.glCallList(myListID);
+//        if ( myListID == -1 ) {
+//            Integer ID = mapBlocksToDisplayList.get(blocks);
+//            if ( ID == null ) {
+//                myListID = gl.glGenLists(1);
+//                gl.glNewList( myListID, GL2.GL_COMPILE_AND_EXECUTE );
+//                for ( Block b : blocks ) {
+//                    b.display( drawable );
+//                }
+//                gl.glEndList();
+//                mapBlocksToDisplayList.put( blocks, myListID );
+//            } else {
+//                myListID = ID;
+//                gl.glCallList(myListID);
+//            }
+//        } else {
+//            gl.glCallList(myListID);
+//        }
+        for ( Block b : blocks ) {
+        	//b.changeColor((float)Math.random());
+            b.display( drawable );
         }
         gl.glPopMatrix();
     }
@@ -349,5 +424,6 @@ public class RigidBody {
             gl.glEnd();
         }
     }
+    
     
 }
