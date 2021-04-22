@@ -17,5 +17,5 @@ To reproduce the result we show in the video, with all starting from the default
 5. load "wallWideDenseHigh",deselect `color changing 1` and do `texture mapping2`;
 6. load "wallWideDenseHigh",deselect `color changing 1` and do `texture mapping1`.
 
-Also, we mainly tested the performance of our SPHash, sleeping bodies, and constraint stabilization using factory. 
+Also, we mainly tested the performance of our SPHash, sleeping bodies, and constraint stabilization using factory. BaumGarte feedback failed to perform well so we suggest to turn the stiffness off. 
 
