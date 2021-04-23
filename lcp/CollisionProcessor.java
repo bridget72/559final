@@ -1,12 +1,16 @@
 package comp559.lcp;
-
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.List;
+import java.util.Random;
+import java.awt.image.BufferedImage;
+import java.io.File;
+import java.io.IOException;
+import java.lang.Math;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
+import javax.imageio.ImageIO;
+import javax.swing.JButton;
 import javax.swing.JPanel;
 import javax.swing.border.TitledBorder;
 import javax.vecmath.Point2d;
@@ -16,426 +20,579 @@ import mintools.parameters.BooleanParameter;
 import mintools.parameters.DoubleParameter;
 import mintools.parameters.IntParameter;
 import mintools.swing.CollapsiblePanel;
+import mintools.swing.HorizontalFlowPanel;
 import mintools.swing.VerticalFlowPanel;
 
 /**
- * Class for detecting and resolving collisions. Currently this class uses
- * penalty forces between rigid bodies.
- * 
+ * Class for detecting and resolving collisions.  Currently this class uses penalty forces between rigid bodies.
  * @author kry
  */
 public class CollisionProcessor {
 
-	private List<RigidBody> bodies;
+    private List<RigidBody> bodies;
+    
+    /**
+     * The current contacts that resulted in the last call to process collisions
+     */
+    public ArrayList<Contact> contacts = new ArrayList<Contact>();
+    
+    /**
+     * Creates this collision processor with the provided set of bodies
+     * @param bodies
+     */
+//    public CollisionProcessor( List<RigidBody> bodies, double imageWidth ) {
+	public CollisionProcessor( List<RigidBody> bodies, HashMap<Integer,ArrayList<RigidBody>> SpHash) {
+        this.bodies = bodies;
+        this.SpHash = SpHash;
+    }
+    
+    /** keeps track of the time used for collision detection on the last call */
+    double collisionDetectTime = 0;
+    
+    /** keeps track of the time used to solve the LCP based velocity update on the last call */
+    double collisionSolveTime = 0;
+    
+    public HashMap <Integer, ArrayList<RigidBody>> SpHash = new HashMap<Integer, ArrayList<RigidBody>>();
+//    public double convFactor = 1/100;
+//    public double width = convFactor;
+    /**
+     * Processes all collisions 
+     * @param dt time step
+     */
+    public void processCollisions( double dt ) {
+        contacts.clear();
+        Contact.nextContactIndex = 0;
+        
+        long now = System.nanoTime();
+        broadPhase();
+        collisionDetectTime = ( System.nanoTime() - now ) * 1e-9;
+                
+        if ( contacts.size() > 0  && doLCP.getValue() ) {
+            now = System.nanoTime();
 
-	/**
-	 * The current contacts that resulted in the last call to process collisions
-	 */
-	public ArrayList<Contact> contacts = new ArrayList<Contact>();
-
-	/**
-	 * Creates this collision processor with the provided set of bodies
-	 * 
-	 * @param bodies
-	 */
-	public CollisionProcessor(List<RigidBody> bodies) {
-		this.bodies = bodies;
-	}
-
-	/** keeps track of the time used for collision detection on the last call */
-	double collisionDetectTime = 0;
-
-	/**
-	 * keeps track of the time used to solve the LCP based velocity update on the
-	 * last call
-	 */
-	double collisionSolveTime = 0;
-
-	public Map<Contact, double[]> blockPairs = new HashMap<>();
-
-	/**
-	 * Processes all collisions
-	 * 
-	 * @param dt time step
-	 */
-	public void processCollisions(double dt) {
-		contacts.clear();
-		Contact.nextContactIndex = 0;
-
-		long now = System.nanoTime();
-		broadPhase();
-		collisionDetectTime = (System.nanoTime() - now) * 1e-9;
-
-		if (contacts.size() > 0 && doLCP.getValue()) {
-			now = System.nanoTime();
-
-			double bounce = restitution.getValue();
-			double mu = friction.getValue();
-			// TODO: obj3 Compute velocity update with iterative solve of contact constraint
-			// matrix.
-
-			/**
-			 * J 2k*3n Minv 3n*3n Jt 3n*2k D 2k*1 b 2k*1 lambda 2k*1 Minv has (1/mass 1/mass
-			 * 1/inertia 1/......) on diagonal
-			 */
-
-			// set up w= A lambda + b
-			double[] b = new double[2 * contacts.size()];
-			double[] D = new double[2 * contacts.size()];
-			for (Contact c : contacts) {
-				int idx = c.index;
-				double[] v = { c.body1.v.x, c.body1.v.y, c.body1.omega, c.body2.v.x, c.body2.v.y, c.body2.omega };
-				double[] f = { c.body1.force.x, c.body1.force.y, c.body1.torque, c.body2.force.x, c.body2.force.y,
-						c.body2.torque };
-
-				// compute b = J(v+dt*f/M)
-				double tmp1 = 0;
-				double tmp2 = 0;
-				for (int i = 0; i < 6; i++) {
-					tmp1 += c.J.get(0, i) * (v[i] + dt * f[i] * c.m[i]);
-					// 3.4 include bounce contribution
-					tmp1 += c.J.get(0, i) * v[i] * bounce;
-					tmp2 += c.J.get(1, i) * (v[i] + dt * f[i] * c.m[i]);
-				}
-				b[2 * idx] = tmp1;
-				b[2 * idx + 1] = tmp2;
-
-				// compute Dii, list of diagonal of A = JM^-1J^T
-				double tmp3 = 0;
-				double tmp4 = 0;
-				for (int j = 0; j < 6; j++) {
-					tmp3 += c.J.get(0, j) * c.m[j] * c.J.get(0, j);
-					tmp4 += c.J.get(1, j) * c.m[j] * c.J.get(1, j);
-				}
-				D[2 * idx] = tmp3;
-				D[2 * idx + 1] = tmp4;
-			}
-
-			// divisions are avoided by computing bi' = bi/Dii
-			double[] bp = new double[2 * contacts.size()];
-			for (int i = 0; i < b.length; i++) {
-				bp[i] = b[i] / D[i];
-			}
-
-			// initialize lambda with 0 as suggested in discussion board
-			double[] lambda = new double[2 * contacts.size()];
-			double[] dV = new double[3 * bodies.size()];
-
-			for (int i = 0; i < iterations.getValue(); i++) {
-				// TODO: obj4 randomize the order of inner loop, boolean parameter was added in
-				// the control panel
-				if (randomization.getValue()) {
-					Collections.shuffle(contacts);
-				}
-
-				for (Contact c : contacts) {
-
-					// TODO: obj5 warm start PGS solve at each step
-					if (warm.getValue()) {
-						if (blockPairs.containsKey(c)) {
-							lambda[2 * c.index] = blockPairs.get(c)[0];
-							lambda[2 * c.index + 1] = blockPairs.get(c)[1];
-						}
+            double bounce = restitution.getValue();
+            double mu = friction.getValue();
+            // obj 3
+            //TODO: Compute velocity update with iterative solve of contact constraint matrix.
+            double[] lambda = new double[contacts.size()*2];
+            double[] b = new double[lambda.length];
+            double[] Dii = new double [lambda.length];
+            double[] deltaV = new double [3*bodies.size()];
+            for (Contact c : contacts) {
+            	RigidBody b1 = c.body1;
+            	RigidBody b2 = c.body2;
+            	int i = c.index;
+            	//b = J*(u + dt*minv*force)
+            	double [] u = new double[] {b1.v.x, b1.v.y, b1.omega, b2.v.x,b2.v.y,b2.omega};
+            	double [] f = new double[] {b1.force.x, b1.force.y, b1.torque, b2.force.x, b2.force.y, b2.torque};
+            	double [] m = new double[] {b1.minv, b1.minv, b1.jinv, b2.minv, b2.minv, b2.jinv};
+            	
+                double distance = (b1.x.x-b2.x.x)*(b1.x.x-b2.x.x)+(b1.x.y-b2.x.y)*(b1.x.y-b2.x.y);
+                double interpenetration = distance - Block.radius * 2; // a negative quantity
+            	
+            	
+            	double baum = 0;
+            	if(ifBaumgarte.getValue()) {
+            		baum = BaumgarteK.getValue();
+            	}
+            	
+            	for (int j=0;j<u.length;j++) {
+            		b[2*i]+=c.J1[j]*(bounce*u[j]+u[j]+dt*f[j]*m[j]+1e-7*baum*interpenetration);
+            		b[2*i+1]+=c.J2[j]*(u[j]+dt*f[j]*m[j]);
+//            		Dii = Ji0^2*mAinv + ji1^2*mAinv + ji2^2*jAinv +...
+            		Dii[2*i]+=c.J1[j]*c.J1[j]*m[j];
+            		Dii[2*i+1]+=c.J2[j]*c.J2[j]*m[j];
+            	}
+            	Point2d pB1 = new Point2d();
+    			Point2d pB2 = new Point2d();
+    			b1.transformW2B.transform(c.contactW, pB1);
+    			b2.transformW2B.transform(c.contactW, pB2);
+            	if (warmStart.getValue()&& b1.cHash.containsKey(pB1)&& b1.cHash.get(pB1)[0]==b2.index) {
+                	//if using warm start, initialize lambda with previously stored lambdas
+            		//first do the transformations
+        			//if pB1, [b2.index, pB2.x, pB2.y] in b1.BH set lambda & deltav accordingly
+    				lambda[2*i] = b1.nHash.get(pB1)[0];
+    				lambda[2*i+1] = b1.tHash.get(pB1)[0];
+    				for (int k=0;k<3;k++) {
+	        			deltaV[3*b1.index+k] +=m[k]*c.J1[k]*b1.nHash.get(pB1)[1];
+	        			deltaV[3*b1.index+k] +=m[k]*c.J2[k]*b1.tHash.get(pB1)[1];
+	        			deltaV[3*b2.index+k] +=m[k+3]*c.J1[k+3]*b1.nHash.get(pB1)[1];
+	        			deltaV[3*b2.index+k] +=m[k+3]*c.J2[k+3]*b1.tHash.get(pB1)[1];
+        			}
+                }
+            }
+            for (int i = 0;i<iterations.getValue();i++) {
+            	if (randomization.getValue())
+            		Collections.shuffle(contacts);
+	        	for (Contact c : contacts) {
+	        		int j = c.index;
+//	        	lambda_i_new = lambda_i + (-b-J*v)/Dii
+	        		double lKplus1 = -b[2*j]/Dii[2*j] + lambda[2*j];
+	        		double complianceVal = 0;
+	        		if(ifCompliance.getValue()) {
+	        			complianceVal = compliance.getValue();	
+	        		}
+					for (int k = 0; k < 3; k ++) {
+						lKplus1 -= c.J1[k] * deltaV[3* c.body1.index + k] / (Dii[2*j]+complianceVal);
+						lKplus1 -= c.J1[k + 3]  * deltaV[3* c.body2.index+k]/ (Dii[2*j]+complianceVal);
 					}
+					lKplus1 = Math.max(0,lKplus1);
+	        		double delLamb = lKplus1 - lambda[2*j];
+	        		lambda[2*j] = lKplus1;
+	        		double high = mu*lKplus1;
+	        		
+//	        		update deltaV = minv*J*delta_Lambda
+	        		double [] m = new double[] {c.body1.minv, c.body1.minv, c.body1.jinv, c.body2.minv, c.body2.minv, c.body2.jinv};
 
-					double lambda1 = -bp[2 * c.index] + lambda[2 * c.index];
-					// assign lambda = lambda - bp - Jrowi*dV
-					for (int j = 0; j < 3; j++) {
-						lambda1 -= c.J.get(0, j) * dV[3 * c.body1.index + j] / D[2 * c.index];
-						lambda1 -= c.J.get(0, j + 3) * dV[3 * c.body2.index + j] / D[2 * c.index];
+	        		for (int k=0;k<3;k++) {
+	        			deltaV[3*c.body1.index+k] +=m[k]*c.J1[k]*delLamb;
+	        			deltaV[3*c.body2.index+k] +=m[k+3]*c.J1[k+3]*delLamb;
+	        		}
+	        		
+	        		double lambFric = -b[2*j+1]/Dii[2*j+1] + lambda[2*j+1];
+	        		for (int k = 0; k < 3; k ++) {
+	        			lambFric -= c.J2[k] * deltaV[3*c.body1.index+k] / (Dii[2*j+1]+complianceVal);
+	        			lambFric -= c.J2[k+3]  * deltaV[3*c.body2.index+k]/(Dii[2*j+1]+complianceVal);
 					}
-					// lower BD for lambda1
-					lambda1 = Math.max(0, lambda1);
-					double dlambda1 = lambda1 - lambda[2 * c.index];
-					lambda[2 * c.index] = lambda1;
+//	        		projection
+	        		lambFric = Math.max(lambFric, -high);
+	        		lambFric = Math.min(lambFric, high);
+	        		double delLamb2 = lambFric - lambda[2*j+1];
+	        		lambda[2*j+1] = lambFric;
 
-					double lambda2 = -bp[2 * c.index + 1] + lambda[2 * c.index + 1];
-					for (int j = 0; j < 3; j++) {
-						lambda2 -= c.J.get(1, j) * dV[3 * c.body1.index + j] / D[2 * c.index + 1];
-						lambda2 -= c.J.get(1, j + 3) * dV[3 * c.body2.index + j] / D[2 * c.index + 1];
-					}
-					// compute BD with eq(29) and project lambda i with eq(30)
-					double hi = mu * lambda[2 * c.index];
-					lambda2 = Math.min(Math.max(-hi, lambda2), hi);
-					double dlambda2 = lambda2 - lambda[2 * c.index + 1];
-					lambda[2 * c.index + 1] = lambda2;
+	        		for (int k=0;k<3;k++) {
+	        			deltaV[3*c.body1.index+k] +=m[k]*c.J2[k]*delLamb2;
+	        			deltaV[3*c.body2.index+k] +=m[k+3]*c.J2[k+3]*delLamb2;
+	        		}
+	        		if(i==iterations.getValue()-1 && warmStart.getValue()) {
+	        			//last iteration I update the lambda hash and position hash
+	        			c.body1.clearHashes();
+	        			c.body2.clearHashes();
+	        			//for blockHashes I map the pB1 to [body2.index, pB2.x, pB2.y]
+	        			Point2d pB1 = new Point2d();
+	        			Point2d pB2 = new Point2d();
+	        			c.body1.transformW2B.transform(c.contactW, pB1);
+	        			c.body2.transformW2B.transform(c.contactW, pB2);
+	        			Double[] pB1Val =  {(double)c.body2.index,pB2.x,pB2.y};
+	        			Double[] pB2Val =  {(double)c.body1.index,pB1.x,pB1.y};
+	        			Double[] nL = {lambda[2*j],delLamb};
+	        			Double[] tL = {lambda[2*j+1],delLamb2};
+	        			c.body1.cHash.put(pB1, pB1Val);
+	        			c.body1.nHash.put(pB1, nL);
+	        			c.body1.tHash.put(pB1, tL);
+	        			c.body2.cHash.put(pB2, pB2Val);
+	        			c.body2.nHash.put(pB2, nL);
+	        			c.body2.tHash.put(pB2, tL);
+	        			
+	        		}
+	        	}
+            }
+	        for (RigidBody bd : bodies) {
+	        	int i = bd.index;
+	        	bd.v.x += deltaV[3*i];
+	        	bd.v.y += deltaV[3*i+1];
+	        	bd.omega += deltaV[3*i+2];
+	        }
+//	        SpHash = new HashMap<>();
+            collisionSolveTime = (System.nanoTime() - now) * 1e-9;
+        }
+    }
+    
+    /**
+     * Checks for collisions between bodies.  Note that you can optionaly implement some broad
+     * phase test such as spatial hashing to reduce the n squared body-body tests.
+     * Currently this does the naive n squared collision check.
+     */
+    private void broadPhase() {
+        // Naive n squared body test.. might not be that bad for small number of bodies 
+        visitID++;
+        //double kineticEnergyThres = 1e-1;
+        if(!SpatialHash.getValue()) {
+        	for ( RigidBody b1 : bodies ) {
+        		for ( RigidBody b2 : bodies ) { // not so inefficient given the continue on the next line
+        			if ( b1.index >= b2.index ) continue;
+        			if ((b1.pinned || b1.sleep) && (b2.pinned || b2.sleep)) continue;        
+        			narrowPhase( b1, b2 );  
+        			
+        			
+        		}
+        	}
+        }
+        else {
+    		for (RigidBody b1 : bodies) {
+    			if(b1.bucketKey.isEmpty()) continue;
+    			for(int x:b1.bucketKey) {
+	    			if(SpHash.containsKey(x)) {
+		    			for (RigidBody b2 : SpHash.get(x)) {
+		    				if(b1.index >= b2.index) continue;
+		    				if ((b1.pinned || b1.sleep) && (b2.pinned || b2.sleep)) continue; 
+		    				narrowPhase(b1,b2);
+		    			}
+	    			}
+    			}
+    			b1.bucketKey.clear();
+    		}
+    	}   
+    }
+    
+    /**
+     * Checks for collision between boundary blocks on two rigid bodies.
+     * TODO: This needs to be improved as the n-squared block test is too slow!
+     * @param body1
+     * @param body2
+     */
+    private void narrowPhase( RigidBody body1, RigidBody body2 ) {
+    	double kineticEnergyThres = 1e-4;
+        if (body1.getKineticEnergy()*body1.minv >= kineticEnergyThres || body2.getKineticEnergy()*body2.minv >= kineticEnergyThres) {
 
-					// update dV = dV + Tcloi dlambda, 12 nonzero entries
-					dV[3 * c.body1.index] += c.m[0] * c.J.get(0, 0) * dlambda1;
-					dV[3 * c.body1.index + 1] += c.m[1] * c.J.get(0, 1) * dlambda1;
-					dV[3 * c.body1.index + 2] += c.m[2] * c.J.get(0, 2) * dlambda1;
-					dV[3 * c.body2.index] += c.m[3] * c.J.get(0, 3) * dlambda1;
-					dV[3 * c.body2.index + 1] += c.m[4] * c.J.get(0, 4) * dlambda1;
-					dV[3 * c.body2.index + 2] += c.m[5] * c.J.get(0, 5) * dlambda1;
-
-					dV[3 * c.body1.index] += c.m[0] * c.J.get(1, 0) * dlambda2;
-					dV[3 * c.body1.index + 1] += c.m[1] * c.J.get(1, 1) * dlambda2;
-					dV[3 * c.body1.index + 2] += c.m[2] * c.J.get(1, 2) * dlambda2;
-					dV[3 * c.body2.index] += c.m[3] * c.J.get(1, 3) * dlambda2;
-					dV[3 * c.body2.index + 1] += c.m[4] * c.J.get(1, 4) * dlambda2;
-					dV[3 * c.body2.index + 2] += c.m[5] * c.J.get(1, 5) * dlambda2;
-				}
-			}
-
-			for (RigidBody rb : bodies) {
-				rb.v.x += dV[3 * rb.index + 0];
-				rb.v.y += dV[3 * rb.index + 1];
-				rb.omega += dV[3 * rb.index + 2];
-			}
-
-			if (warm.getValue()) {
-				for (Contact c : contacts) {
-					double[] lambdaVal = { lambda[2 * c.index], lambda[2 * c.index + 1] };
-					blockPairs.put(c, lambdaVal);
-				}
-			}
-			collisionSolveTime = (System.nanoTime() - now) * 1e-9;
-		}
-	}
-
-	/**
-	 * Checks for collisions between bodies. Note that you can optionally implement
-	 * some broad phase test such as spatial hashing to reduce the n squared
-	 * body-body tests. Currently this does the naive n squared collision check.
-	 */
-	private void broadPhase() {
-		// Naive n squared body test.. might not be that bad for small number of bodies
-		visitID++;
-		for (RigidBody b1 : bodies) {
-			for (RigidBody b2 : bodies) { // not so inefficient given the continue on the next line
-				/*
-				 * if(b1.getKineticEnergy()>=1e-5 || b2.getKineticEnergy()>=1e-5) {
-				 * System.out.println(b1.getKineticEnergy()); if ( b1.index >= b2.index )
-				 * continue; if ( b1.pinned && b2.pinned ) continue; narrowPhase( b1, b2 ); }
-				 */
+        	if ( ! useBVTree.getValue() ) {
+                for ( Block b1 : body1.blocks ) {
+                    for ( Block b2 : body2.blocks ) {
+                        processCollision( body1, b1, body2, b2 );
+                    }
+                }
+            } else {
+                // object 2
+            	//TODO: implement code to use hierarchical collision detection on body pairs
+            	detection (body1,body2,body1.root,body2.root);
+            }
+        	
+        	body1.sleep = false;
+    		body2.sleep = false;
+        	} else if (body1.getKineticEnergy()*body1.minv < kineticEnergyThres) {
+        		body1.sleep = true;
+        	} else if (body2.getKineticEnergy()*body2.minv < kineticEnergyThres) {
+        		body2.sleep = true;
+        }  
+        
+    } 
+    //traverse recursively
+    public void detection(RigidBody body1, RigidBody body2, BVNode bn1, BVNode bn2) {
+    	Disc first = bn1.boundingDisc;    	
+    	Disc second = bn2.boundingDisc;
+    	if (bn1.visitID!=visitID) {
+    		bn1.visitID = visitID;
+    		bn1.boundingDisc.updatecW();
+    	}
+    	if (bn2.visitID != visitID){
+    		bn2.visitID = visitID;
+    		bn2.boundingDisc.updatecW();
+    	}
+    	if (first.intersects(second)) {
+    		//If nodes are leaves we can process the collisions directly.
+    		BVNode [] lst = {bn1.child1,bn1.child2,bn2.child1,bn2.child2};
+    		//we let the user choose to perform narrow check or not
+    		if(bn1.isLeaf()&&bn2.isLeaf()) {
+    				processCollision(body1,bn1.leafBlock,body2,bn2.leafBlock); 
+    		}
+    		else if (bn1.isLeaf()) {
+    			detection(body1,body2,bn1,lst[2]);
+    			detection(body1,body2,bn1, lst[3]);
+    		} 
+    		else if (bn2.isLeaf()) {
+    			detection(body1,body2,lst[0],bn2);
+    			detection(body1,body2,lst[1],bn2);
+    		} 
+    		else {
+    			detection(body1,body2,lst[0],lst[2]);
+    			detection(body1,body2,lst[0],lst[3]);
+    			detection(body1,body2,lst[1],lst[2]);
+    			detection(body1,body2,lst[1],lst[3]);    			
+    		}
+    	}
+    }	    
+    /** 
+     * The visitID is used to tag boundary volumes that are visited in 
+     * a given time step.  Marking boundary volume nodes as visited during
+     * a time step allows for a visualization of those used, but it can also
+     * be used to more efficiently update the centeres of bounding volumes
+     * (i.e., call a BVNode's updatecW method at most once on any given timestep)
+     */
+    int visitID = 0;
+    
+    /**
+     * Resets the state of the collision processor by clearing all
+     * currently identified contacts, and reseting the visitID for
+     * tracking the bounding volumes used
+     */
+    public void reset() {
+        contacts.clear();
+        Contact.nextContactIndex = 0;
+        visitID = 0;            
+    }
+    
+    // some working variables for processing collisions
+    private Point2d tmp1 = new Point2d();
+    private Point2d tmp2 = new Point2d();
+    private Point2d contactW = new Point2d();
+    private Vector2d force = new Vector2d();
+    private Vector2d contactV1 = new Vector2d();
+    private Vector2d contactV2 = new Vector2d();
+    private Vector2d relativeVelocity = new Vector2d();
+    private Vector2d normal = new Vector2d();
+        
+    /**
+     * Processes a collision between two bodies for two given blocks that are colliding.
+     * Currently this implements a penalty force
+     * @param body1
+     * @param b1
+     * @param body2
+     * @param b2
+     */
+    private void processCollision( RigidBody body1, Block b1, RigidBody body2, Block b2 ) {        
+        double k = contactSpringStiffness.getValue();
+        double c1 = contactSpringDamping.getValue();
+        double threshold = separationVelocityThreshold.getValue();
+        boolean useSpring = enableContactSpring.getValue();
+        boolean useDamping = enableContactDamping.getValue();
+        
+        if(colorChanging.getValue()) {
+        	float rand1 = (float)Math.random();
+        	float rand2 = (float)Math.random();
+        	float rand3 = (float)Math.random();
+        	
+			
+			  if (!body1.pinned && !body2.pinned) { 
+				  for (Block b: body1.blocks) {
+					  b.changeColor(rand1,rand2,rand3);
+					  //b.changeColor((float)0.000, (float)0.808, (float)0.820);
+			      } 
+				  
+				  for (Block b: body2.blocks) {
+					  b.changeColor(rand1,rand2,rand3);
+					  //b.changeColor((float)0.933, (float)0.510, (float)0.933);
+			      } 
+			  }
+			 
+			
 				
-				  if ( b1.index >= b2.index ) continue; 
-				 // if ( b1.pinned && b2.pinned ) continue;
-				  if ( (b1.pinned || b1.sleep) && (b2.pinned || b2.sleep) ) continue;
-				  narrowPhase( b1, b2 );
+				  if(body1.pinned) { for (Block b: body1.blocks) { b.changeColor(0f,0f,0f); } }
+				  if(body2.pinned) { for (Block b: body2.blocks) { b.changeColor(0f,0f,0f); } }
 				 
-			}
-		}
-	}
+        }
+        
+        if(colorChanging1.getValue()) {
+        	float rand1 = (float)Math.random();
+        	float rand2 = (float)Math.random();
+        	float rand3 = (float)Math.random();
 
-	/**
-	 * Checks for collision between boundary blocks on two rigid bodies. TODO: obj2
-	 * This needs to be improved as the n-squared block test is too slow!
-	 * 
-	 * @param body1
-	 * @param body2
-	 */
-	private void narrowPhase(RigidBody body1, RigidBody body2) {
-		if (!useBVTree.getValue()) {
-			for (Block b1 : body1.blocks) {
-				for (Block b2 : body2.blocks) {
-					processCollision(body1, b1, body2, b2);
-				}
-			}
-		} else {
-			// TODO: obj2 implement code to use hierarchical collision detection on body
-			// pairs
-			traverse(body1, body1.root, body2, body2.root);
-		}
-	}
-
-	public void traverse(RigidBody body1, BVNode root1, RigidBody body2, BVNode root2) {
-		// update the center before calling intersect
-
-		if (root1.visitID != visitID) {
-			root1.boundingDisc.updatecW();
-			root1.visitID = visitID;
-		}
-		if (root2.visitID != visitID) {
-			root2.boundingDisc.updatecW();
-			root2.visitID = visitID;
-		}
-
-		body2.root.boundingDisc.updatecW();
-
-		if (body1.root.boundingDisc.intersects(body2.root.boundingDisc)) {
-			if (root1.isLeaf() && root2.isLeaf()) {
-				processCollision(body1, root1.leafBlock, body2, root2.leafBlock);
-			} else if (root1.isLeaf()) {
-				traverse(body1, root1, body2, root2.child1);
-				traverse(body1, root1, body2, root2.child2);
-			} else if (root2.isLeaf()) {
-				traverse(body1, root1.child1, body2, root2);
-				traverse(body1, root1.child2, body2, root2);
-			} else {
-				traverse(body1, root1.child1, body2, root2.child1);
-				traverse(body1, root1.child1, body2, root2.child2);
-				traverse(body1, root1.child2, body2, root2.child1);
-				traverse(body1, root1.child2, body2, root2.child2);
-			}
-
-		}
-	}
-
-	/**
-	 * The visitID is used to tag boundary volumes that are visited in a given time
-	 * step. Marking boundary volume nodes as visited during a time step allows for
-	 * a visualization of those used, but it can also be used to more efficiently
-	 * update the centers of bounding volumes (i.e., call a BVNode's updatecW method
-	 * at most once on any given timestep)
-	 */
-	int visitID = 0;
-
-	/**
-	 * Resets the state of the collision processor by clearing all currently
-	 * identified contacts, and reseting the visitID for tracking the bounding
-	 * volumes used
-	 */
-	public void reset() {
-		contacts.clear();
-		Contact.nextContactIndex = 0;
-		visitID = 0;
-	}
-
-	// some working variables for processing collisions
-	private Point2d tmp1 = new Point2d();
-	private Point2d tmp2 = new Point2d();
-	private Point2d contactW = new Point2d();
-	private Vector2d force = new Vector2d();
-	private Vector2d contactV1 = new Vector2d();
-	private Vector2d contactV2 = new Vector2d();
-	private Vector2d relativeVelocity = new Vector2d();
-	private Vector2d normal = new Vector2d();
-
-	/**
-	 * Processes a collision between two bodies for two given blocks that are
-	 * colliding. Currently this implements a penalty force
-	 * 
-	 * @param body1
-	 * @param b1
-	 * @param body2
-	 * @param b2
-	 */
-	private void processCollision(RigidBody body1, Block b1, RigidBody body2, Block b2) {
-		double k = contactSpringStiffness.getValue();
-		double c1 = contactSpringDamping.getValue();
-		double threshold = separationVelocityThreshold.getValue();
-		boolean useSpring = enableContactSpring.getValue();
-		boolean useDamping = enableContactDamping.getValue();
-		double kineticEnergyThres = 1e-1;
-		//System.out.println(body1.getKineticEnergy()+" "+body2.getKineticEnergy());
-		if(body1.getKineticEnergy()>=kineticEnergyThres || body2.getKineticEnergy()>=kineticEnergyThres) {
+			  for (Block b: body1.blocks) { b.changeColor(rand1,rand2,rand3);
+			  
+			  } for (Block b: body2.blocks) { b.changeColor(rand1,rand2,rand3); }
+			 
+        }
+        
+        if(colorChanging2.getValue()) {
+			
+			  if (!body1.pinned && !body2.pinned) { 
+				  for (Block b: body1.blocks) {
+					  b.changeColor((float)0.000, (float)0.808, (float)0.820);
+			      } 
+				  
+				  for (Block b: body2.blocks) {
+					  b.changeColor((float)0.933, (float)0.510, (float)0.933);
+			      } 
+			  }
+			 
+				
+				  if(body1.pinned) { for (Block b: body1.blocks) { b.changeColor(0f,0f,0f); } }
+				  if(body2.pinned) { for (Block b: body2.blocks) { b.changeColor(0f,0f,0f); } }
+				 
+        }
+    	
+        if(textureMapping.getValue()) {
+        	BufferedImage img = null;
+        	try {
+        		img = ImageIO.read(new File("datalcp/texture2.jpg"));
+        	} catch (IOException e) {
+        	    System.out.println("Texture image not loaded.");
+        	}
+            
+            for (Block b: body1.blocks) {
+          	  b.mapTexture(img);
+            } 
+      	    
+            for (Block b: body2.blocks) {
+          	  b.mapTexture(img);
+            } 
+        }
+        
+        if(textureMapping1.getValue()) {
+        	BufferedImage img = null;
+        	try {
+        		img = ImageIO.read(new File("datalcp/texture3.jpg"));
+        	} catch (IOException e) {
+        	    System.out.println("Texture image not loaded.");
+        	}
+            
+            for (Block b: body1.blocks) {
+          	  b.mapTexture(img);
+            } 
+      	    
+            for (Block b: body2.blocks) {
+          	  b.mapTexture(img);
+            } 
+        }
+        
+      double kineticEnergyThres = 1e-4;
+        
+      if (body1.getKineticEnergy() >= kineticEnergyThres || body2.getKineticEnergy() >= kineticEnergyThres) {
 			body1.transformB2W.transform(b1.pB, tmp1);
 			body2.transformB2W.transform(b2.pB, tmp2);
 			double distance = tmp1.distance(tmp2);
-			if (distance < Block.radius * 2) {
-				// contact point at halfway between points
-				// NOTE: this assumes that the two blocks have the same radius!
-				contactW.interpolate(tmp1, tmp2, .5);
-				// contact normal
-				normal.sub(tmp2, tmp1);
-				normal.normalize();
-				// create the contact
-				Contact contact = new Contact(body1, body2, contactW, normal);
-				// simple option... add to contact list.				
-				contacts.add(contact);
-				 
-				if (!doLCP.getValue()) {
-					// compute relative body velocity at contact point
-					body1.getSpatialVelocity(contactW, contactV1);
-					body2.getSpatialVelocity(contactW, contactV2);
-					relativeVelocity.sub(contactV1, contactV2);
-					if (-relativeVelocity.dot(normal) < threshold) {
-						if (useSpring) {
-							// spring force
-							double interpenetration = distance - Block.radius * 2; // a negative quantity
-							force.scale(-interpenetration * k, normal);
-							body2.applyContactForceW(contactW, force);
-							force.scale(-1);
-							body1.applyContactForceW(contactW, force);
-						}
-						if (useDamping) {
-							// spring damping forces!
-							// vertical
-							force.scale(relativeVelocity.dot(normal) * c1, normal);
-							body2.applyContactForceW(contactW, force);
-							force.scale(-1);
-							body1.applyContactForceW(contactW, force);
-						}
-					}
-				}
-			}
-			body1.sleep = false;
-			body2.sleep = false;
-	    }
-		else if(body1.getKineticEnergy()<kineticEnergyThres) {
-			body1.sleep = true;
-		}else if(body2.getKineticEnergy()<kineticEnergyThres) {
-			body2.sleep = true;
-		}
-	}
+	        if ( distance < Block.radius * 2 ) {
+	            // contact point at halfway between points 
+	            // NOTE: this assumes that the two blocks have the same radius!
+	            contactW.interpolate( tmp1, tmp2, .5 );
+	            // contact normal
+	            normal.sub( tmp2, tmp1 );
+	            normal.normalize();
+	            // create the contact
+	            Contact contact = new Contact( body1, body2, contactW, normal);
+	            // simple option... add to contact list...
+	            contacts.add( contact );
+	            if ( ! doLCP.getValue()) {
+	                // compute relative body velocity at contact point
+	                body1.getSpatialVelocity( contactW, contactV1 );
+	                body2.getSpatialVelocity( contactW, contactV2 );
+	                relativeVelocity.sub( contactV1, contactV2 );
+	                if ( -relativeVelocity.dot( normal ) < threshold ) {
+	                    if ( useSpring ) {
+	                        // spring force
+	                        double interpenetration = distance - Block.radius * 2; // a negative quantity
+	                        force.scale( -interpenetration * k, normal );
+	                        body2.applyContactForceW(contactW, force);
+	                        force.scale(-1);
+	                        body1.applyContactForceW(contactW, force);
+	                    }
+	                    if ( useDamping ) {
+	                        // spring damping forces!
+	                        // vertical
+	                        force.scale( relativeVelocity.dot(normal) * c1, normal );                    
+	                        body2.applyContactForceW( contactW, force );
+	                        force.scale(-1);
+	                        body1.applyContactForceW( contactW, force );
+	                    }
+	                }
+	            }
+	        }
+	    
+	        body1.sleep = false;
+	        body2.sleep = false;
+    		} else if (body1.getKineticEnergy() < kineticEnergyThres) {
+    			body1.sleep = true;
+    		} else if (body2.getKineticEnergy() < kineticEnergyThres) {
+    			body2.sleep = true;
+    		}
+    }
+   
+    /** Stiffness of the contact penalty spring */
+    private DoubleParameter contactSpringStiffness = new DoubleParameter("penalty contact stiffness", 1e3, 1, 1e5 );
+    
+    /** Viscous damping coefficient for the contact penalty spring */
+    private DoubleParameter contactSpringDamping = new DoubleParameter("penalty contact damping", 10, 1, 1e4 );
+    
+    /** Threshold for the relative velocity in the normal direction, for determining if spring force will be applied. */
+    private DoubleParameter separationVelocityThreshold = new DoubleParameter( "penalty separation velocity threshold (controls bounce)", 1e-9, 1e-9, 1e3 );
+    
+    /** Enables the contact penalty spring */
+    private BooleanParameter enableContactSpring = new BooleanParameter("enable penalty contact spring", true );
+    
+    /** Enables damping of the contact penalty spring */
+    private BooleanParameter enableContactDamping = new BooleanParameter("enable penalty contact damping", true );
+    
+    /** Restitution parameter for contact constraints */
+    public DoubleParameter restitution = new DoubleParameter( "restitution (bounce)", 0.3, 0, 1 );
+    
+    /** Coulomb friction coefficient for contact constraint */
+    public DoubleParameter friction = new DoubleParameter("Coulomb friction", 0.33, 0, 2 );
+    
+    /** Number of iterations to use in projected Gauss Seidel solve */
+    public IntParameter iterations = new IntParameter("iterations for GS solve", 10, 1, 500);
+    
+    public BooleanParameter ifBaumgarte= new BooleanParameter("use Baumgarte", false);
+    
+    public DoubleParameter BaumgarteK = new DoubleParameter("BaumgarteK", 0.0, 0, 10 );
+    
+	public BooleanParameter ifCompliance = new BooleanParameter("use compliance", false );
+	
+	public DoubleParameter compliance = new DoubleParameter("compliance", 1e-3, 1e-10, 1  );
+    
+    /** Flag for switching between penalty based contact and contact constraints */
+    private BooleanParameter doLCP = new BooleanParameter( "do LCP solve", true );
+    
+    /** Flag for enabling the use of hierarchical collision detection for body pairs */
+    private BooleanParameter useBVTree = new BooleanParameter( "use BVTree", true );
+    
+    private BooleanParameter randomization = new BooleanParameter ("randomization",true);
+    
+    private BooleanParameter warmStart = new BooleanParameter ("warm start", false);
+    
+    private BooleanParameter colorChanging = new BooleanParameter ("color changing2", false);
+    private BooleanParameter colorChanging1 = new BooleanParameter ("color changing1", true);
+    private BooleanParameter colorChanging2 = new BooleanParameter ("color changing3", false);
+    
+    private BooleanParameter textureMapping = new BooleanParameter ("texture mapping1", false);
+    private BooleanParameter textureMapping1 = new BooleanParameter ("texture mapping2", false);
+    
+    public BooleanParameter SpatialHash = new BooleanParameter ("Spatial Hash for Broad Phase",false);
+    
+    
+    /**
+     * @return controls for the collision processor
+     */
+    public JPanel getControls() {
+        VerticalFlowPanel vfp = new VerticalFlowPanel();
+        vfp.setBorder( new TitledBorder("Collision Processing Controls") );
+//        vfp.add( useBVTree.getControls() );
+//        vfp.add( doLCP.getControls() );
+//        vfp.add(randomization.getControls());
 
-	/** Stiffness of the contact penalty spring */
-	private DoubleParameter contactSpringStiffness = new DoubleParameter("penalty contact stiffness", 1e3, 1, 1e5);
 
-	/** Viscous damping coefficient for the contact penalty spring */
-	private DoubleParameter contactSpringDamping = new DoubleParameter("penalty contact damping", 10, 1, 1e4);
+        vfp.add( warmStart.getControls());
+        vfp.add( SpatialHash.getControls());
+        
 
-	/**
-	 * Threshold for the relative velocity in the normal direction, for determining
-	 * if spring force will be applied.
-	 */
-	private DoubleParameter separationVelocityThreshold = new DoubleParameter(
-			"penalty separation velocity threshold (controls bounce)", 1e-9, 1e-9, 1e3);
+        vfp.add( colorChanging.getControls());
+        HorizontalFlowPanel hfp1 = new HorizontalFlowPanel();
+        hfp1.add( colorChanging1.getControls()); //completely random
+        hfp1.add( colorChanging.getControls() ); //partially fixed
+        hfp1.add( colorChanging2.getControls()); //two colors
+        vfp.add(hfp1.getPanel());
+        
+        
+        HorizontalFlowPanel hfp2 = new HorizontalFlowPanel();
+        hfp2.add( textureMapping.getControls() );
+        hfp2.add( textureMapping1.getControls());
+        vfp.add(hfp2.getPanel());
+        
+        
+        
+        
+        vfp.add( ifCompliance.getControls() );
+		vfp.add( compliance.getSliderControls(true) );  
+		vfp.add( ifBaumgarte.getControls() );
+		vfp.add( BaumgarteK.getSliderControls(true) );
+        
 
-	/** Enables the contact penalty spring */
-	private BooleanParameter enableContactSpring = new BooleanParameter("enable penalty contact spring", true);
-
-	/** Enables damping of the contact penalty spring */
-	private BooleanParameter enableContactDamping = new BooleanParameter("enable penalty contact damping", true);
-
-	/** Restitution parameter for contact constraints */
-	public DoubleParameter restitution = new DoubleParameter("restitution (bounce)", 0, 0, 1);
-
-	/** Coulomb friction coefficient for contact constraint */
-	public DoubleParameter friction = new DoubleParameter("Coulomb friction", 0.33, 0, 2);
-
-	/** Number of iterations to use in projected Gauss Seidel solve */
-	public IntParameter iterations = new IntParameter("iterations for GS solve", 10, 1, 500);
-
-	/** Flag for switching between penalty based contact and contact constraints */
-	private BooleanParameter doLCP = new BooleanParameter("do LCP solve", false);
-
-	/**
-	 * Flag for enabling the use of hierarchical collision detection for body pairs
-	 */
-	private BooleanParameter useBVTree = new BooleanParameter("use BVTree", false);
-
-	private BooleanParameter randomization = new BooleanParameter("use randomization", false);
-
-	private BooleanParameter warm = new BooleanParameter("use warm starts", false);
-
-	/**
-	 * @return controls for the collision processor
-	 */
-	public JPanel getControls() {
-		VerticalFlowPanel vfp = new VerticalFlowPanel();
-		vfp.setBorder(new TitledBorder("Collision Processing Controls"));
-		vfp.add(useBVTree.getControls());
-		vfp.add(doLCP.getControls());
-		vfp.add(randomization.getControls());
-		vfp.add(warm.getControls());
-		vfp.add(iterations.getSliderControls());
-		vfp.add(restitution.getSliderControls(false));
-		vfp.add(friction.getSliderControls(false));
-
-		VerticalFlowPanel vfp2 = new VerticalFlowPanel();
-		vfp2.setBorder(new TitledBorder("penalty method controls"));
-		vfp2.add(contactSpringStiffness.getSliderControls(true));
-		vfp2.add(contactSpringDamping.getSliderControls(true));
-		vfp2.add(separationVelocityThreshold.getSliderControls(true));
-		vfp2.add(enableContactDamping.getControls());
-		vfp2.add(enableContactSpring.getControls());
-
-		CollapsiblePanel cp = new CollapsiblePanel(vfp2.getPanel());
-		cp.collapse();
-		vfp.add(cp);
-		return vfp.getPanel();
-	}
-
+//        VerticalFlowPanel vfp2 = new VerticalFlowPanel();
+//        vfp2.setBorder( new TitledBorder("penalty method controls") );
+//        vfp2.add( contactSpringStiffness.getSliderControls(true) );
+//        vfp2.add( contactSpringDamping.getSliderControls(true) );
+//        vfp2.add( separationVelocityThreshold.getSliderControls( true ) );
+//        vfp2.add( enableContactDamping.getControls() );
+//        vfp2.add( enableContactSpring.getControls() );
+//        CollapsiblePanel cp = new CollapsiblePanel(vfp2.getPanel());
+//        cp.collapse();
+//        vfp.add( cp );  
+		
+        
+        vfp.add( iterations.getSliderControls() );
+        vfp.add( restitution.getSliderControls(false) );
+        vfp.add( friction.getSliderControls(false) );
+        
+        
+        return vfp.getPanel();
+    }
+    
 }

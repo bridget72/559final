@@ -1,6 +1,6 @@
 package comp559.lcp;
-
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Random;
 
 import com.jogamp.opengl.GL2;
@@ -20,14 +20,20 @@ import mintools.swing.VerticalFlowPanel;
  * @author kry
  */
 public class RigidBodySystem {
-
+	public double imageWidth = 0.0;
+	public double imageHeight =0.0;
 	public String name ="";
-	
+//	broad phase
+	public HashMap <Integer, ArrayList<RigidBody>> SpHash = new HashMap<Integer, ArrayList<RigidBody>>();
+    public int numPerRow = 0;
+    public int width = 0;
+    public int[] SHvisitID = new int [1];
+    
     public double simulationTime = 0;
     
 	public ArrayList<RigidBody> bodies = new ArrayList<RigidBody>();
     
-	public CollisionProcessor collisionProcessor = new CollisionProcessor(bodies);
+	public CollisionProcessor collisionProcessor = new CollisionProcessor(bodies,SpHash);
     
     public MouseSpringForce mouseSpring;
     
@@ -51,7 +57,13 @@ public class RigidBodySystem {
     public void add( RigidBody body ) {
         bodies.add( body );
     }
-    
+    public void SHinit(double w, double h) {
+    	imageWidth = w;
+    	imageHeight =h;
+    	numPerRow = 3;
+        width = (int)Math.ceil(imageWidth/numPerRow);
+        SHvisitID = new int [numPerRow*numPerRow*100];
+    }
     /**
      * Applies a small random acceleration to all bodies
      */
@@ -81,7 +93,6 @@ public class RigidBodySystem {
      */
     public void advanceTime( double dt ) {
         long now = System.nanoTime();        
-
         mouseSpring.apply();
         // apply gravity to all bodies
         if ( useGravity.getValue() ) {
@@ -95,15 +106,56 @@ public class RigidBodySystem {
             }
         }
         
-        
-        
         if ( processCollisions.getValue() ) {
             // process collisions, given the current time step
+        	collisionProcessor.SpHash = this.SpHash;
             collisionProcessor.processCollisions( dt );
         }
         // advance the system by the given time step
         for ( RigidBody b : bodies ) {
             b.advanceTime(dt);
+	//         we identify its cell and add to the SpHash 
+            if(collisionProcessor.SpatialHash.getValue()) {
+            	int key = 0;
+            	//TODO: check here 
+            	if(b.pinned||b.sleep) {
+	        		for(Block bl : b.boundaryBlocks) {
+	        			key = (int)(Math.floor(bl.j/(imageWidth/numPerRow)) + Math.floor((bl.i-1)/imageHeight));
+	//        			if(SHvisitID[key]!=collisionProcessor.visitID) {
+	//        				SpHash.remove(key);
+	        			if (SpHash.containsKey(key)) {
+		    				if(!SpHash.get(key).contains(b))
+			    				SpHash.get(key).add(b);
+			    		}else {
+			    			ArrayList<RigidBody> temp = new ArrayList <RigidBody>();
+			    			temp.add(b);
+			    			SpHash.put(key,temp);
+			    		}
+			    		if(!b.bucketKey.contains(key))
+			    			b.bucketKey.add(key);
+	//		    		SHvisitID[key]=collisionProcessor.visitID;
+	        		}
+	        	/**if you wanna run factory, please comment this else block
+	        	 * **
+	        	 */
+            	}else {
+        			key = (int)(Math.floor(b.x.x/(imageWidth/numPerRow)) + Math.floor((b.x.y-1)/imageHeight));
+//        			if(SHvisitID[key]!=collisionProcessor.visitID) {
+//        				SpHash.remove(key);
+        			if (SpHash.containsKey(key)) {
+	    				if(!SpHash.get(key).contains(b))
+		    				SpHash.get(key).add(b);
+		    		}else {
+		    			ArrayList<RigidBody> temp = new ArrayList <RigidBody>();
+		    			temp.add(b);
+		    			SpHash.put(key,temp);
+		    		}
+		    		if(!b.bucketKey.contains(key))
+		    			b.bucketKey.add(key);
+//		    		SHvisitID[key]=collisionProcessor.visitID;
+            	}
+
+	    	}
         }
         
         computeTime = (System.nanoTime() - now) / 1e9;
@@ -225,6 +277,17 @@ public class RigidBodySystem {
         VerticalFlowPanel vfp = new VerticalFlowPanel();
         vfp.setBorder( new TitledBorder("Rigid Body System Controls" ));
         
+
+        
+//      vfp.add( processCollisions.getControls() );
+        
+        
+        vfp.add( collisionProcessor.getControls() );
+        
+//        vfp.add( useGravity.getControls() );
+//        vfp.add( gravityAmount.getSliderControls(false) );
+//        vfp.add( gravityAngle.getSliderControls(false) );
+//        
         VerticalFlowPanel vfpv = new VerticalFlowPanel();
         vfpv.setBorder( new TitledBorder("viewing controls") );
         vfpv.add( drawBodies.getControls() );
@@ -240,12 +303,18 @@ public class RigidBodySystem {
         cp.collapse();
         vfp.add( cp );
         
-        vfp.add( processCollisions.getControls() );
-        vfp.add( collisionProcessor.getControls() );
+        VerticalFlowPanel vfp2 = new VerticalFlowPanel();
+        vfp2.setBorder( new TitledBorder("gravity") );
+        vfp2.add( useGravity.getControls() );
+        vfp2.add( gravityAmount.getSliderControls(false) );
+        vfp2.add( gravityAngle.getSliderControls(false) );
         
-        vfp.add( useGravity.getControls() );
-        vfp.add( gravityAmount.getSliderControls(false) );
-        vfp.add( gravityAngle.getSliderControls(false) );
+        CollapsiblePanel cp2 = new CollapsiblePanel(vfp2.getPanel());
+        cp2.collapse();
+        vfp.add( cp2 );
+        
+        
+        
         return vfp.getPanel();
     }
     

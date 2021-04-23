@@ -1,5 +1,4 @@
 package comp559.lcp;
-
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.util.ArrayList;
@@ -57,8 +56,8 @@ public class ImageBlocker {
                     // this is part of a new body!
                     ArrayList<Block> blocks = new ArrayList<Block>();
                     ArrayList<Block> boundaryBlocks = new ArrayList<Block>();
-                    searchConnected( x, y, blocks, boundaryBlocks );
-                    RigidBody body = new RigidBody( blocks, boundaryBlocks );
+                    searchConnected( x, y, blocks, boundaryBlocks);
+                    RigidBody body = new RigidBody( blocks, boundaryBlocks);
                     bodies.add( body );
                 }
             }
@@ -81,7 +80,7 @@ public class ImageBlocker {
      * Searches for all pixels connected to given block using grass fire.
      * Uses a queue rather than recursion to avoid stack overflow in large images
      */
-    private void searchConnected( int x, int y, ArrayList<Block> blocks, ArrayList<Block> boundaryBlocks ) {
+    private void searchConnected( int x, int y, ArrayList<Block> blocks, ArrayList<Block> boundaryBlocks) {
         List<Coord> Q = new LinkedList<Coord>();
         visited[x][y] = true;
         Q.add( new Coord(x,y) );
@@ -128,7 +127,6 @@ public class ImageBlocker {
         }   
         return false;
     }
-    
     /** 
      * Gets the colour of the specified pixel
      * @param x

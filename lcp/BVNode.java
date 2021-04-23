@@ -1,5 +1,4 @@
 package comp559.lcp;
-
 import java.util.ArrayList;
 import java.util.List;
 
@@ -20,7 +19,7 @@ public class BVNode {
 
     /** Bounding disc for all leaves in this subtree */
     Disc boundingDisc;
-    
+
     BVNode child1;
     
     BVNode child2;
@@ -39,17 +38,16 @@ public class BVNode {
      * @param body
      */
     public BVNode( List<Block> blocks, RigidBody body ) {
-        
         // create our own bounding disc
         boundingDisc = new Disc(blocks, body);
-        
         if ( blocks.size() == 1 ) {
             leafBlock = blocks.get(0);
         } else {        
-            // find the distribution       
+            // find the distribution
             Block b0 = blocks.get(0);
+//            System.out.println("first block in list"+b0.pB);
             Point2d max = new Point2d( b0.pB );
-            Point2d min = new Point2d( b0.pB );            
+            Point2d min = new Point2d( b0.pB );
             for ( Block b : blocks ) {
                 max.x = Math.max( max.x, b.pB.x );
                 max.y = Math.max( max.y, b.pB.y );
@@ -77,6 +75,9 @@ public class BVNode {
                     }
                 }
             }
+//            System.out.println("do I have L1?"+L1.size());
+//            System.out.println("do I have L2?"+L2.size());
+//            System.out.println("do I have body?"+(body!=null));
             child1 = new BVNode(L1, body);
             child2 = new BVNode(L2, body);            
         }

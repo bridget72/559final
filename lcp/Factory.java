@@ -1,5 +1,4 @@
 package comp559.lcp;
-
 import java.util.ArrayList;
 import java.util.Random;
 
@@ -52,7 +51,7 @@ public class Factory {
                 unpinnedBodies.add(b);
             }
         }
-        seed.set( blocker.width*0.5, -blocker.height*0.2 );
+        seed.set( blocker.width*0.5, blocker.height*0.2 );
     }
         
     /**

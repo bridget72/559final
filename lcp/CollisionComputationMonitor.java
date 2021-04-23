@@ -1,5 +1,4 @@
 package comp559.lcp;
-
 import java.util.ArrayList;
 import java.util.LinkedList;
 
