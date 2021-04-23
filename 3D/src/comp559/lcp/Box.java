@@ -18,9 +18,6 @@ public class Box{
 //	public Camera camera = new Camera();
 	public void set(RigidBody b) {
 		this.b = b;
-		System.out.println(b.blocks.get(0).c);
-		System.out.println(b.blocks.get(0).alpha);
-		System.out.println(b.vertex);
 		this.quad.set(b.blocks.get(0).c,b.blocks.get(0).alpha, b.vertex);
 		this.width = b.vertex.get(2).x-b.vertex.get(0).x;
 		this.height = b.vertex.get(1).y-b.vertex.get(0).y;

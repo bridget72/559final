@@ -29,7 +29,8 @@ public class RigidBody {
     /** storing lambda values of previous time step*/
     /** Variable to keep track of identifiers that can be given to rigid bodies */
     static public int nextIndex = 0;
-    
+//    public boolean isBox = false;
+    public boolean isBox = true;
     /** Block approximation of geometry */
     ArrayList<Block> blocks;
     
@@ -53,8 +54,8 @@ public class RigidBody {
     /** accumulator for torques acting on this body */
     Vector3d torque = new Vector3d();
     Matrix3d torqhat = new Matrix3d();
-    public int imageWidth = 1000;
-    public int imageHeight = 1000;
+    public int imw = 1000;
+    public int imh = 1000;
     double massAngular;
     
     double massLinear;
@@ -90,7 +91,9 @@ public class RigidBody {
     /**for gl drawing */
     public Vector3d rotAxis = new Vector3d();
     public double thed = 0.0;
-    public boolean isBox = false;
+    public double width;
+    public double height;
+    public double depth;
     
     /** angular velocity in radians per second */
     public Vector3d omega = new Vector3d();
@@ -106,8 +109,9 @@ public class RigidBody {
      * @param blocks
      * @param boundaryBlocks
      */
-    public RigidBody( ArrayList<Block> blocks, ArrayList<Block> boundaryBlocks) {
-
+    public RigidBody( ArrayList<Block> blocks, ArrayList<Block> boundaryBlocks, int imw, int imh) {
+    	this.imw = imw;
+    	this.imh = imh;
         this.blocks = blocks;
         this.boundaryBlocks = boundaryBlocks;       
         // compute the mass and center of mass position        
@@ -213,22 +217,49 @@ public class RigidBody {
     }
     /** vertex for drawing (and spatial hash?)
      */
+    public void setMeas(ArrayList<Block> b) {
+    	int xmin = 1000000;
+    	int xmax = -100000;
+    	int ymin = 1000000;
+    	int ymax = -100000;	
+    	int zmin = 1000000;
+    	int zmax = -100000;
+    	for (Block block :b) {
+    		if (block.j>xmax) xmax = block.j;
+    		if(block.j<xmin) xmin = block.j;
+    		if(block.i>ymax) ymax = block.i;
+    		if(block.i<ymin) ymin = block.i;
+    		if(block.k>zmax) zmax = block.k;
+    		if(block.k<zmin) zmin = block.k;
+    	}
+    	this.width = xmax-xmin;
+    	this.height = ymax-ymin;
+    	this.depth = zmax-zmin;
+    }
     public ArrayList<Point3d> getVertex(ArrayList<Block> b){
     	ArrayList<Point3d> vert= new ArrayList<Point3d>();
     	int xmin = 1000000;
     	int xmax = -100000;
     	int ymin = 1000000;
     	int ymax = -100000;	
+    	int zmin = 1000000;
+    	int zmax = -100000;
     	for (Block block :b) {
     		if (block.j>xmax) xmax = block.j;
     		if(block.j<xmin) xmin = block.j;
     		if(block.i>ymax) ymax = block.i;
     		if(block.i<ymin) ymin = block.i;
+    		if(block.k>zmax) zmax = block.k;
+    		if(block.k<zmin) zmin = block.k;
     	}
-    	vert.add(new Point3d(xmin,ymin,0));
-    	vert.add(new Point3d(xmin,ymax,0));
-    	vert.add(new Point3d(xmax,ymin,0));
-    	vert.add(new Point3d(xmax,ymax,0));
+    	vert.add(new Point3d(xmin,ymin,zmin));
+    	vert.add(new Point3d(xmin,ymax,zmin));
+    	vert.add(new Point3d(xmax,ymin,zmin));
+    	vert.add(new Point3d(xmax,ymax,zmin));
+    	vert.add(new Point3d(xmin,ymin,zmax));
+    	vert.add(new Point3d(xmin,ymax,zmax));
+    	vert.add(new Point3d(xmax,ymin,zmax));
+    	vert.add(new Point3d(xmax,ymax,zmax));
     	return vert;
     }
     /**
@@ -396,6 +427,7 @@ public class RigidBody {
      * @param drawable
      */
     public void display( GLAutoDrawable drawable ) {
+    	System.out.println("displaying body"+this.index);
     	GL2 gl = drawable.getGL().getGL2();
     	GLU glu = new GLU();
     	float t = 1.0f;
@@ -403,9 +435,6 @@ public class RigidBody {
 	        gl.glPushMatrix();
 	        gl.glTranslated( x.x, x.y,x.z);
 //	        System.out.println("torqhat is "+ this.torqhat.toString());
-//	        System.out.println("torque x value is "+rotAxis.x);
-//	        System.out.println("torque y value is "+rotAxis.y);
-//	        System.out.println("torque z value is "+rotAxis.z);
 //	        System.out.println("theta value is "+thed);
 //	        gl.glRotated(thed, rotAxis.x,rotAxis.y,rotAxis.z);
 	        gl.glRotated(thed, torque.x,torque.y,torque.z);
@@ -429,17 +458,14 @@ public class RigidBody {
 	        gl.glPopMatrix();
     	}
     	else {
-    		this.vertex = getVertex(this.boundaryBlocks);
-    		this.c = this.blocks.get(0).c;
     		gl.glPushMatrix();
-	        gl.glTranslated( x.x+10, x.y+100,x.z);
-	        gl.glRotated(thed, rotAxis.x,rotAxis.y,rotAxis.z);
-            rend.resize(drawable, imageWidth/10, imageHeight/10);
+    		this.setMeas(this.boundaryBlocks);
+    		this.c = this.blocks.get(0).c;
+            rend.resize(drawable, imw*5, imh*5);
             rend.init(drawable);
 //	        float offset = 1.0f;
 //		    rend.t += offset;
-	        rend.display(drawable,this);
-	     
+	        rend.display(drawable,this, imw*5,imh*5);
 	        gl.glPopMatrix();
     	}
     }

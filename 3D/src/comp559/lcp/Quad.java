@@ -18,12 +18,6 @@ import javax.vecmath.Point3d;
 
 import comp559.lcp.RigidBody;
 public class Quad {
-
-//	private static boolean initialized = false;
-//	private static int positionBufferID;
-//	private static int normalBufferID;
-//	private static int elementBufferID;
-//	
 	public Color3f c= new Color3f();
 	public float alpha = 0;
 	public ArrayList<Point3d> vertex;

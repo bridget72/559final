@@ -226,7 +226,9 @@ public class RigidBodySystem {
         }        
         if ( drawBodies.getValue() ) {
             for ( RigidBody b : bodies ) {
+            	System.out.println("b4");
                 b.display( drawable );
+                System.out.println("after");
             }
         }
         gl.glLineWidth(1);

@@ -120,7 +120,7 @@ public class LCPApp implements SceneGraphNode, Interactor {
             }
         }
         
-        gl.glDisable( GL.GL_DEPTH_TEST );
+//        gl.glDisable( GL.GL_DEPTH_TEST );
         EasyViewer.beginOverlay(drawable);
 
         gl.glPushMatrix();
@@ -305,7 +305,7 @@ public class LCPApp implements SceneGraphNode, Interactor {
     				boundaryBlocks.add(block);
     			}
     			System.out.println("boundary blocks size =" +boundaryBlocks.size());
-    			RigidBody body = new RigidBody(blocks,boundaryBlocks);
+    			RigidBody body = new RigidBody(blocks,boundaryBlocks,(int)imageWidth,(int)imageHeight);
     			system.bodies.add(body);
 //    			br.readLine();
     		}

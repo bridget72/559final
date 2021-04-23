@@ -59,7 +59,7 @@ public class ImageBlocker {
                     ArrayList<Block> blocks = new ArrayList<Block>();
                     ArrayList<Block> boundaryBlocks = new ArrayList<Block>();
                     searchConnected( x, y, blocks, boundaryBlocks);
-                    RigidBody body = new RigidBody( blocks, boundaryBlocks);
+                    RigidBody body = new RigidBody( blocks, boundaryBlocks,width,height);
                     bodies.add( body );
                 }
             }

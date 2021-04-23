@@ -75,9 +75,9 @@ public class RigidTransform {
     public double getTheta (Vector3d theta, Matrix3d th) {
     	Matrix3d rotation = getRotation (theta, th);
     	double thed = rotation.m00+rotation.m11+rotation.m22;
-    	System.out.println("trace value is "+thed);
+//    	System.out.println("trace value is "+thed);
     	thed = ((thed%180-1)/2)/180*Math.PI;
-    	System.out.println("angle in acos transferred to radian is "+thed);
+//    	System.out.println("angle in acos transferred to radian is "+thed);
     	thed = Math.acos(thed);
     	return thed;
     }

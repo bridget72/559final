@@ -2,6 +2,8 @@ package comp559.lcp;
 import com.jogamp.opengl.GL;
 import com.jogamp.opengl.GL2;
 import com.jogamp.opengl.GLAutoDrawable;
+import com.jogamp.opengl.glu.GLU;
+
 import javax.vecmath.Color3f;
 import javax.vecmath.Point3d;
 
@@ -72,12 +74,15 @@ public class Block {
 //        gl.glVertex3d( pB.x - h, pB.y - h,pB.z-h );
 //        gl.glVertex3d( pB.x - h, pB.y + h,pB.z-h );
 //        gl.glVertex3d( pB.x + h, pB.y - h,pB.z-h );
-//        gl.glVertex3d( pB.x + h, pB.y + h,pB.z-h );
+//        gl.glVertex3d( pB.x + h, pB.y + h,pB.z-h );  
+        gl.glEnd();
+        
+//        gl.glBegin(GL.GL_TRIANGLE_STRIP);
 //        gl.glVertex3d( pB.x - h, pB.y - h,pB.z+h );
 //        gl.glVertex3d( pB.x - h, pB.y + h,pB.z+h );
 //        gl.glVertex3d( pB.x + h, pB.y - h,pB.z+h );
 //        gl.glVertex3d( pB.x + h, pB.y + h,pB.z+h );
-        gl.glEnd();
+//        gl.glEnd();
     }
     
 }
