@@ -17,5 +17,7 @@ To reproduce the result we show in the video, with all starting from the default
 5. load "wallWideDenseHigh",deselect `color changing 1` and do `texture mapping2`;
 6. load "wallWideDenseHigh",deselect `color changing 1` and do `texture mapping1`.
 
+In the illustration video, we only showed the 2D scene based on our 3D system, as the 3D renderer could not handle projection-scaled translation. To reproduce the video content, set RigidBody boolean attribute to <false> (can comment line 33 & uncomment line 32). Otherwise, this source code draws box having the measurement ratios and color of the corresponding body.
+
 Also, we mainly tested the performance of our SPHash, sleeping bodies, and constraint stabilization using factory. BaumGarte feedback failed to perform well so we suggest to turn the stiffness off. 
 
