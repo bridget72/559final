@@ -49,10 +49,10 @@ public class Renderer {
     	double zt = 0.0;
     	gl.glPushMatrix();
     	gl.glRotated(b.thed, b.rotAxis.x, b.rotAxis.y, b.rotAxis.z);
-//		gl.glTranslated( xt, -yt,zt);
-    	Vector3d tl = new Vector3d (b.x.x,b.x.y,b.x.z);
-    	tl.scale(h/b.imh);
-    	gl.glTranslated(tl.x,tl.y,tl.z);
+		gl.glTranslated( xt, -yt,zt);
+//    	Vector3d tl = new Vector3d (b.x.x,b.x.y,b.x.z);
+//    	tl.scale(h/b.imh);
+//    	gl.glTranslated(tl.x,tl.y,tl.z);
 		float yfact= (float)(b.height/b.width);
 		float zfact= (float)(b.depth/b.width);
 		if (b.depth==0.0) zfact = 0.5f;
